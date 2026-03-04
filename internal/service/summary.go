@@ -51,7 +51,7 @@ func (s *CheckinService) handleSummaryToday(event *linebot.Event) {
 			durationStr = fmt.Sprintf("%d ชม. %d นาที", hours, mins)
 		}
 
-		msg += fmt.Sprintf("👤 %s\n", att.User.Name)
+		msg += fmt.Sprintf("👤 %s\n", att.User.DisplayName)
 		msg += fmt.Sprintf("   🕗 เข้า: %s\n", checkInStr)
 		msg += fmt.Sprintf("   🕔 ออก: %s\n", checkOutStr)
 		msg += fmt.Sprintf("   ⏱ รวม: %s\n\n", durationStr)
