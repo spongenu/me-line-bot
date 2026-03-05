@@ -21,9 +21,28 @@ func main() {
 		log.Fatal("LINE bot init error:", err)
 	}
 
+	// Repositories
 	userRepo := repository.NewUserRepository(db)
 	attRepo := repository.NewAttendanceRepository(db)
-	checkinSvc := service.NewCheckinService(bot, userRepo, attRepo, cfg)
+
+	// Rich Menu
+	richMenuSvc := service.NewRichMenuService(cfg.LineAccessToken)
+	if err := richMenuSvc.Setup(
+		"assets/richmenu/menu_a.png",
+		"assets/richmenu/menu_b.png",
+		"assets/richmenu/menu_c.png",
+	); err != nil {
+		log.Println("⚠️ Rich Menu setup error:", err)
+	} else {
+		log.Println("✅ Rich Menu setup complete")
+
+		go richMenuSvc.AssignMenuToExistingUsers(userRepo)
+	}
+
+	// Services
+	checkinSvc := service.NewCheckinService(bot, userRepo, attRepo, cfg, richMenuSvc)
+
+	// Handlers
 	webhookHandler := handler.NewWebhookHandler(bot, checkinSvc)
 
 	http.HandleFunc("/webhook", webhookHandler.Handle)

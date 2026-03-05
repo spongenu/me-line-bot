@@ -86,3 +86,7 @@ func (r *UserRepository) UpdateProfile(userID uint, displayName, pictureURL stri
 			"picture_url":  pictureURL,
 		}).Error
 }
+
+func (r *UserRepository) FindAllActive(users *[]model.User) error {
+	return r.db.Where("is_active = ?", true).Find(users).Error
+}

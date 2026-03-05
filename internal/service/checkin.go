@@ -16,12 +16,13 @@ type userState struct {
 }
 
 type CheckinService struct {
-	bot      *linebot.Client
-	userRepo *repository.UserRepository
-	attRepo  *repository.AttendanceRepository
-	cfg      *config.Config
-	states   map[string]*userState
-	mu       sync.Mutex
+	bot         *linebot.Client
+	userRepo    *repository.UserRepository
+	attRepo     *repository.AttendanceRepository
+	cfg         *config.Config
+	richMenuSvc *RichMenuService
+	states      map[string]*userState
+	mu          sync.Mutex
 }
 
 func NewCheckinService(
@@ -29,13 +30,15 @@ func NewCheckinService(
 	userRepo *repository.UserRepository,
 	attRepo *repository.AttendanceRepository,
 	cfg *config.Config,
+	richMenuSvc *RichMenuService,
 ) *CheckinService {
 	return &CheckinService{
-		bot:      bot,
-		userRepo: userRepo,
-		attRepo:  attRepo,
-		cfg:      cfg,
-		states:   make(map[string]*userState),
+		bot:         bot,
+		userRepo:    userRepo,
+		attRepo:     attRepo,
+		cfg:         cfg,
+		richMenuSvc: richMenuSvc,
+		states:      make(map[string]*userState),
 	}
 }
 

@@ -57,6 +57,11 @@ func (s *CheckinService) handleRegisterName(event *linebot.Event, name string) {
 		s.userRepo.AddRole(user.ID, role.ID, nil)
 	}
 
+	// Assign Rich Menu A
+	if s.richMenuSvc != nil {
+		go s.richMenuSvc.AssignMenu(userId, RichMenuA)
+	}
+
 	s.mu.Lock()
 	delete(s.states, userId)
 	s.mu.Unlock()
@@ -65,6 +70,20 @@ func (s *CheckinService) handleRegisterName(event *linebot.Event, name string) {
 		"✅ ลงทะเบียนสำเร็จ! คุณ"+name+"\n\n⏳ รอการอนุมัติจาก admin ก่อนนะครับ")
 
 	log.Printf("New user registered: %s (%s) - pending approval", name, userId)
+}
+
+// AssignMenuByRole กำหนด Rich Menu ตาม role
+func (s *CheckinService) AssignMenuByRole(lineUserID string, userID uint) {
+	if s.richMenuSvc == nil {
+		return
+	}
+	if s.userRepo.HasRole(userID, "admin") {
+		s.richMenuSvc.AssignMenu(lineUserID, RichMenuC)
+	} else if s.userRepo.HasRole(userID, "staff") {
+		s.richMenuSvc.AssignMenu(lineUserID, RichMenuB)
+	} else {
+		s.richMenuSvc.AssignMenu(lineUserID, RichMenuA)
+	}
 }
 
 // syncProfile sync ชื่อและรูป profile จาก LINE (background)

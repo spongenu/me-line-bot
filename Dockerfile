@@ -8,12 +8,13 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o me-bot ./cmd/server
 
-# Stage 2: Run (image เล็ก)
+# Stage 2: Run
 FROM alpine:3.19
 RUN apk add --no-cache tzdata ca-certificates
 WORKDIR /app
 
 COPY --from=builder /app/me-bot .
+COPY assets/ ./assets/
 
 EXPOSE 8080
 CMD ["./me-bot"]
