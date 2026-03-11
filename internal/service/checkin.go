@@ -5,6 +5,7 @@ import (
 	"log"
 	"me-bot/internal/config"
 	"me-bot/internal/repository"
+	"strings"
 	"sync"
 	"time"
 
@@ -85,7 +86,13 @@ func (s *CheckinService) HandleText(event *linebot.Event, text string) {
 	case "สรุปวันนี้", "summary":
 		s.handleSummaryToday(event)
 	default:
-		s.replyMainMenu(event.ReplyToken)
+		// เช็คว่าขึ้นต้นด้วย "สรุป " ไหม
+		if strings.HasPrefix(text, "สรุป ") {
+			dateStr := strings.TrimPrefix(text, "สรุป ")
+			s.handleSummaryByDate(event, dateStr)
+		} else {
+			s.replyMainMenu(event.ReplyToken)
+		}
 	}
 }
 
@@ -166,8 +173,17 @@ func (s *CheckinService) HandleLocation(event *linebot.Event, lat, lng float64) 
 			s.replyText(event.ReplyToken, "❌ เกิดข้อผิดพลาด กรุณาลองใหม่")
 			return
 		}
+		checkInDate := att.CheckInTime.In(bangkokTZ()).Format("2006-01-02")
+		checkOutDate := now.Format("2006-01-02")
+		nextDayMark := ""
+		if checkOutDate != checkInDate {
+			nextDayMark = " (+1)"
+		}
 		s.replyText(event.ReplyToken,
-			fmt.Sprintf("✅ เช็คเอาท์สำเร็จ!\n🕔 เวลาออก: %s น.\n⏱ ทำงานรวม: %d ชม. %d นาที", timeStr, hours, mins))
+			fmt.Sprintf("✅ เช็คเอาท์สำเร็จ!\n🕔 เวลาออก: %s%s\n⏱ ทำงานรวม: %d ชม. %d นาที",
+				timeStr, nextDayMark, hours, mins))
+		// s.replyText(event.ReplyToken,
+		// 	fmt.Sprintf("✅ เช็คเอาท์สำเร็จ!\n🕔 เวลาออก: %s น.\n⏱ ทำงานรวม: %d ชม. %d นาที", timeStr, hours, mins))
 		s.pushToGroup(shop.LineGroupID,
 			fmt.Sprintf("🔴 เช็คเอาท์\n👤 %s\n🕗 เข้างาน: %s น.\n🕔 ออกงาน: %s น.\n⏱ รวม: %d ชม. %d นาที\n🏪 %s",
 				user.DisplayName, checkInStr, timeStr, hours, mins, shop.Name))

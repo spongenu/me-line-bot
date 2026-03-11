@@ -4,6 +4,7 @@ import (
 	"log"
 	"me-bot/internal/service"
 	"net/http"
+	"strings"
 
 	"github.com/line/line-bot-sdk-go/v7/linebot"
 )
@@ -29,14 +30,21 @@ func (h *WebhookHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		switch event.Type {
 
 		case linebot.EventTypeMessage:
-			if event.Source.Type != linebot.EventSourceTypeUser {
-				continue
-			}
 			switch msg := event.Message.(type) {
 			case *linebot.TextMessage:
-				h.svc.HandleText(event, msg.Text)
+				if event.Source.Type == linebot.EventSourceTypeUser {
+					// DM — รับทุกคำสั่ง
+					h.svc.HandleText(event, msg.Text)
+				} else if event.Source.Type == linebot.EventSourceTypeGroup {
+					// Group — รับแค่ สรุปวันนี้
+					if msg.Text == "สรุปวันนี้" || msg.Text == "summary" || strings.HasPrefix(msg.Text, "สรุป ") {
+						h.svc.HandleSummaryInGroup(event, msg.Text)
+					}
+				}
 			case *linebot.LocationMessage:
-				h.svc.HandleLocation(event, msg.Latitude, msg.Longitude)
+				if event.Source.Type == linebot.EventSourceTypeUser {
+					h.svc.HandleLocation(event, msg.Latitude, msg.Longitude)
+				}
 			}
 
 		case linebot.EventTypeJoin:
