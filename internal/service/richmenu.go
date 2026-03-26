@@ -149,13 +149,13 @@ func (s *RichMenuService) AssignMenuToExistingUsers(userRepo *repository.UserRep
 
 func (s *RichMenuService) buildMenuA() map[string]interface{} {
 	return map[string]interface{}{
-		"size":        map[string]int{"width": 2500, "height": 1686},
+		"size":        map[string]int{"width": 2500, "height": 843},
 		"selected":    true,
 		"name":        "Menu A - Register",
 		"chatBarText": "Menu",
 		"areas": []map[string]interface{}{
 			{
-				"bounds": map[string]int{"x": 0, "y": 0, "width": 2500, "height": 1686},
+				"bounds": map[string]int{"x": 0, "y": 0, "width": 2500, "height": 843},
 				"action": map[string]string{"type": "message", "text": "ลงทะเบียน"},
 			},
 		},
@@ -164,28 +164,9 @@ func (s *RichMenuService) buildMenuA() map[string]interface{} {
 
 func (s *RichMenuService) buildMenuB() map[string]interface{} {
 	return map[string]interface{}{
-		"size":        map[string]int{"width": 2500, "height": 1686},
+		"size":        map[string]int{"width": 2500, "height": 843},
 		"selected":    true,
 		"name":        "Menu B - Staff",
-		"chatBarText": "Menu",
-		"areas": []map[string]interface{}{
-			{
-				"bounds": map[string]int{"x": 0, "y": 0, "width": 1250, "height": 1686},
-				"action": map[string]string{"type": "message", "text": "เช็คอิน"},
-			},
-			{
-				"bounds": map[string]int{"x": 1250, "y": 0, "width": 1250, "height": 1686},
-				"action": map[string]string{"type": "message", "text": "เช็คเอาท์"},
-			},
-		},
-	}
-}
-
-func (s *RichMenuService) buildMenuC() map[string]interface{} {
-	return map[string]interface{}{
-		"size":        map[string]int{"width": 2500, "height": 1686},
-		"selected":    true,
-		"name":        "Menu C - Admin",
 		"chatBarText": "Menu",
 		"areas": []map[string]interface{}{
 			{
@@ -196,8 +177,27 @@ func (s *RichMenuService) buildMenuC() map[string]interface{} {
 				"bounds": map[string]int{"x": 1250, "y": 0, "width": 1250, "height": 843},
 				"action": map[string]string{"type": "message", "text": "เช็คเอาท์"},
 			},
+		},
+	}
+}
+
+func (s *RichMenuService) buildMenuC() map[string]interface{} {
+	return map[string]interface{}{
+		"size":        map[string]int{"width": 2500, "height": 843},
+		"selected":    true,
+		"name":        "Menu C - Admin",
+		"chatBarText": "Menu",
+		"areas": []map[string]interface{}{
 			{
-				"bounds": map[string]int{"x": 0, "y": 843, "width": 2500, "height": 843},
+				"bounds": map[string]int{"x": 0, "y": 0, "width": 833, "height": 843},
+				"action": map[string]string{"type": "message", "text": "เช็คอิน"},
+			},
+			{
+				"bounds": map[string]int{"x": 833, "y": 0, "width": 833, "height": 843},
+				"action": map[string]string{"type": "message", "text": "เช็คเอาท์"},
+			},
+			{
+				"bounds": map[string]int{"x": 1666, "y": 0, "width": 834, "height": 843},
 				"action": map[string]string{"type": "message", "text": "สรุปวันนี้"},
 			},
 		},
