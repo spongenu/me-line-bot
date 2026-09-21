@@ -129,6 +129,13 @@ func (s *CheckinService) buildSummaryMessage(replyToken, date, displayDate strin
 			hours := att.WorkDurationMin / 60
 			mins := att.WorkDurationMin % 60
 			durationStr = fmt.Sprintf("%dชม. %dนาที", hours, mins)
+		} else if att.CheckInTime != nil {
+			now := time.Now().In(bangkokTZ())
+			if now.Sub(*att.CheckInTime) > MaxShiftDuration {
+				checkOutStr = "- (ลืมเช็คเอาท์)"
+			} else {
+				checkOutStr = "- (กำลังทำงาน)"
+			}
 		}
 
 		msg += fmt.Sprintf("👤 %s\n", att.User.DisplayName)

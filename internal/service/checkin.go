@@ -12,6 +12,8 @@ import (
 	"github.com/line/line-bot-sdk-go/v7/linebot"
 )
 
+const MaxShiftDuration = 18 * time.Hour
+
 type userState struct {
 	Step string // "awaiting_name", "awaiting_checkin_location", "awaiting_checkout_location"
 }
@@ -154,13 +156,15 @@ func (s *CheckinService) HandleLocation(event *linebot.Event, lat, lng float64) 
 		s.pushToGroup(shop.LineGroupID,
 			fmt.Sprintf("✅ เช็คอิน\n👤 %s\n🕐 เวลา: %s น.\n🏪 %s", user.DisplayName, timeStr, shop.Name))
 	} else {
-		att, _ := s.attRepo.FindTodayByUser(user.ID, today)
-		if att == nil {
-			s.replyText(event.ReplyToken, "❌ คุณยังไม่ได้เช็คอินวันนี้")
+		att, err := s.attRepo.FindLatestOpenByUser(user.ID)
+		if err != nil || att == nil {
+			s.replyText(event.ReplyToken, "❌ ไม่พบรายการเช็คอินที่รอเช็คเอาท์")
 			return
 		}
-		if att.CheckOutTime != nil {
-			s.replyText(event.ReplyToken, "ℹ️ คุณได้เช็คเอาท์แล้ววันนี้")
+		if att.CheckInTime != nil && now.Sub(*att.CheckInTime) > MaxShiftDuration {
+			hours := int(now.Sub(*att.CheckInTime).Hours())
+			s.replyText(event.ReplyToken,
+				fmt.Sprintf("❌ ไม่สามารถเช็คเอาท์ได้เนื่องจากเกินเวลาที่กำหนด (ผ่านมา %d ชม. เกินเกณฑ์ 18 ชม.)\nกรุณากด 'เช็คอิน' สำหรับวันใหม่ และติดต่อ admin เพื่อแก้ไขเวลาย้อนหลังครับ", hours))
 			return
 		}
 		durationMin := int(now.Sub(*att.CheckInTime).Minutes())
@@ -182,11 +186,9 @@ func (s *CheckinService) HandleLocation(event *linebot.Event, lat, lng float64) 
 		s.replyText(event.ReplyToken,
 			fmt.Sprintf("✅ เช็คเอาท์สำเร็จ!\n🕔 เวลาออก: %s%s\n⏱ ทำงานรวม: %d ชม. %d นาที",
 				timeStr, nextDayMark, hours, mins))
-		// s.replyText(event.ReplyToken,
-		// 	fmt.Sprintf("✅ เช็คเอาท์สำเร็จ!\n🕔 เวลาออก: %s น.\n⏱ ทำงานรวม: %d ชม. %d นาที", timeStr, hours, mins))
 		s.pushToGroup(shop.LineGroupID,
-			fmt.Sprintf("🔴 เช็คเอาท์\n👤 %s\n🕗 เข้างาน: %s น.\n🕔 ออกงาน: %s น.\n⏱ รวม: %d ชม. %d นาที\n🏪 %s",
-				user.DisplayName, checkInStr, timeStr, hours, mins, shop.Name))
+			fmt.Sprintf("🔴 เช็คเอาท์\n👤 %s\n🕗 เข้างาน: %s น.\n🕔 ออกงาน: %s%s\n⏱ รวม: %d ชม. %d นาที\n🏪 %s",
+				user.DisplayName, checkInStr, timeStr, nextDayMark, hours, mins, shop.Name))
 	}
 }
 
@@ -228,14 +230,16 @@ func (s *CheckinService) handleCheckoutRequest(event *linebot.Event) {
 		return
 	}
 
-	today := time.Now().In(bangkokTZ()).Format("2006-01-02")
-	att, _ := s.attRepo.FindTodayByUser(user.ID, today)
-	if att == nil {
-		s.replyText(event.ReplyToken, "❌ คุณยังไม่ได้เช็คอินวันนี้")
+	att, err := s.attRepo.FindLatestOpenByUser(user.ID)
+	if err != nil || att == nil {
+		s.replyText(event.ReplyToken, "❌ ไม่พบรายการเช็คอินที่รอเช็คเอาท์")
 		return
 	}
-	if att.CheckOutTime != nil {
-		s.replyText(event.ReplyToken, "ℹ️ คุณได้เช็คเอาท์แล้ววันนี้")
+	now := time.Now().In(bangkokTZ())
+	if att.CheckInTime != nil && now.Sub(*att.CheckInTime) > MaxShiftDuration {
+		hours := int(now.Sub(*att.CheckInTime).Hours())
+		s.replyText(event.ReplyToken,
+			fmt.Sprintf("❌ ไม่สามารถเช็คเอาท์ได้เนื่องจากเกินเวลาที่กำหนด (ผ่านมา %d ชม. เกินเกณฑ์ 18 ชม.)\nกรุณากด 'เช็คอิน' สำหรับวันใหม่ และติดต่อ admin เพื่อปรับเวลาของกะก่อนหน้าครับ", hours))
 		return
 	}
 

@@ -24,6 +24,18 @@ func (r *AttendanceRepository) FindTodayByUser(userID uint, date string) (*model
 	return &att, nil
 }
 
+// FindLatestOpenByUser หารายการเช็คอินล่าสุดที่ยังไม่ได้เช็คเอาท์
+func (r *AttendanceRepository) FindLatestOpenByUser(userID uint) (*model.Attendance, error) {
+	var att model.Attendance
+	err := r.db.Where("user_id = ? AND check_out_time IS NULL", userID).
+		Order("check_in_time DESC").
+		First(&att).Error
+	if err != nil {
+		return nil, err
+	}
+	return &att, nil
+}
+
 func (r *AttendanceRepository) CreateCheckIn(userID uint, shopID uint, lat, lng float64, t time.Time) error {
 	att := &model.Attendance{
 		UserID:      userID,
