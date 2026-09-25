@@ -5,6 +5,7 @@ interface User {
   ID: number;
   DisplayName: string;
   Name: string;
+  UserRoles?: { Role: { Name: string } }[];
 }
 
 interface Attendance {
@@ -108,7 +109,7 @@ export default function Attendances() {
             >
               <option value="">-- ดูทุกคน --</option>
               {users.filter(u => {
-                const roles = u.UserRoles && u.UserRoles.length > 0 ? u.UserRoles.map(ur => ur.Role.Name) : ['customer'];
+                const roles = u.UserRoles && u.UserRoles.length > 0 ? u.UserRoles.map((ur: any) => ur.Role.Name) : ['customer'];
                 return roles.includes('staff');
               }).map(u => (
                 <option key={u.ID} value={u.ID}>{u.DisplayName || u.Name}</option>
