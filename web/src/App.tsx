@@ -40,6 +40,7 @@ function App() {
             <Route path="attendances" element={<Attendances />} />
             <Route path="leaves" element={<Leaves />} />
           </Route>
+          <Route path="*" element={<div className="p-10 text-center font-bold text-red-600">404 Not Found<br/>Path: {window.location.pathname}<br/>Search: {window.location.search}</div>} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
