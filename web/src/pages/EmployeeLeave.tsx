@@ -74,9 +74,10 @@ export default function EmployeeLeave() {
         liff.closeWindow();
       }, 2000);
       
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to send message', err);
-      setErrorMsg('เกิดข้อผิดพลาดในการส่งข้อมูล');
+      const errMsg = err.response?.data?.message || err.response?.data || err.message || JSON.stringify(err);
+      setErrorMsg(`เกิดข้อผิดพลาด: ${errMsg}`);
       setIsSubmitting(false);
     }
   };
