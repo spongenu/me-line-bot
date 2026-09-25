@@ -22,6 +22,7 @@ interface User {
 export default function Users() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [roleFilter, setRoleFilter] = useState('staff');
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -123,10 +124,16 @@ export default function Users() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
         <div>
           <h2 className="text-2xl font-bold text-gray-800">จัดการพนักงาน</h2>
           <p className="text-gray-500">จัดการสิทธิ์ (Role) และวันทำงานของพนักงาน</p>
+        </div>
+        <div className="flex bg-gray-100 p-1 rounded-lg">
+          <button onClick={() => setRoleFilter('staff')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${roleFilter === 'staff' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>พนักงาน (Staff)</button>
+          <button onClick={() => setRoleFilter('admin')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${roleFilter === 'admin' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>แอดมิน</button>
+          <button onClick={() => setRoleFilter('customer')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${roleFilter === 'customer' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>ลูกค้า</button>
+          <button onClick={() => setRoleFilter('all')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${roleFilter === 'all' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>ทั้งหมด</button>
         </div>
       </div>
 
@@ -141,7 +148,11 @@ export default function Users() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {users.map((user) => {
+              {users.filter(user => {
+                if (roleFilter === 'all') return true;
+                const roleName = user.UserRoles && user.UserRoles.length > 0 ? user.UserRoles[0].Role.Name : 'customer';
+                return roleName === roleFilter;
+              }).map((user) => {
                 const roleName = user.UserRoles && user.UserRoles.length > 0 ? user.UserRoles[0].Role.Name : 'customer';
                 
                 return (
