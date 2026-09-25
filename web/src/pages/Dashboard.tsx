@@ -36,7 +36,10 @@ export default function Dashboard() {
       const attendances = attendancesRes.data || [];
       const system = systemRes.data || { system_open: true, line_quota: 0 };
 
-      const totalUsers = users.length;
+      const totalUsers = users.filter((u: any) => {
+        const roles = u.UserRoles && u.UserRoles.length > 0 ? u.UserRoles.map((ur: any) => ur.Role.Name) : ['customer'];
+        return roles.includes('staff');
+      }).length;
       const pendingLeaves = leaves.filter((l: any) => l.Status === 'pending').length;
       
       const currentMonth = new Date().toISOString().slice(0, 7);

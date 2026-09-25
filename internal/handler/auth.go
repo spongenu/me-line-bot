@@ -65,25 +65,20 @@ func (h *AuthHandler) VerifyLiffHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	isAdmin := false
+	roleName := "customer"
 	for _, ur := range user.UserRoles {
-		if ur.Role.Name == "admin" {
-			isAdmin = true
+		if ur.Role.Name == "admin" || ur.Role.Name == "staff" {
+			roleName = ur.Role.Name
 			break
 		}
 	}
 
-	if !isAdmin {
-		http.Error(w, "Access denied: Admin role required", http.StatusForbidden)
-		return
-	}
-
-	// 3. Issue our own JWT for the Web Dashboard
+	// 3. Issue our own JWT
 	expirationTime := time.Now().Add(24 * time.Hour) // Token valid for 24 hours
 	claims := &middleware.Claims{
 		UserID:     user.ID,
 		LineUserID: user.LineUserID,
-		Role:       "admin",
+		Role:       roleName,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
