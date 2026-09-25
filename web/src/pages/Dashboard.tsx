@@ -184,7 +184,7 @@ export default function Dashboard() {
                   cursor={{ fill: '#F3F4F6' }}
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', padding: '12px' }}
                   labelStyle={{ fontWeight: 'bold', color: '#374151', marginBottom: '4px' }}
-                  formatter={(value: number) => [`${value} ชม.`, 'ชั่วโมงทำงาน']}
+                  formatter={(value: any) => [`${value} ชม.`, 'ชั่วโมงทำงาน']}
                 />
                 <Bar 
                     dataKey="hours" 
