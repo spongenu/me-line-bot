@@ -50,5 +50,7 @@ jobs:
             echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
             echo "DB_NAME=mebot_db" >> .env
             echo "DB_ROOT_PASSWORD=${{ secrets.DB_ROOT_PASSWORD }}" >> .env
+            echo "LINE_LOGIN_CLIENT_ID=2011746778" >> .env
+            echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
             docker compose pull app
             docker compose up -d app
