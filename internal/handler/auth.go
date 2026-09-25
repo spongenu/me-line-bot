@@ -66,11 +66,20 @@ func (h *AuthHandler) VerifyLiffHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	roleName := "customer"
+	hasAdmin := false
+	hasStaff := false
 	for _, ur := range user.UserRoles {
-		if ur.Role.Name == "admin" || ur.Role.Name == "staff" {
-			roleName = ur.Role.Name
-			break
+		if ur.Role.Name == "admin" {
+			hasAdmin = true
+		} else if ur.Role.Name == "staff" {
+			hasStaff = true
 		}
+	}
+	
+	if hasAdmin {
+		roleName = "admin"
+	} else if hasStaff {
+		roleName = "staff"
 	}
 
 	// 3. Issue our own JWT
