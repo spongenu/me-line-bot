@@ -67,6 +67,11 @@ func (s *CheckinService) HandleText(event *linebot.Event, text string) {
 		return
 	}
 
+	if text == "ฉันได้ยื่นคำขอลางานเข้าระบบแล้ว" {
+		s.bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage("ระบบได้รับคำขอลางานของคุณแล้วค่ะ แอดมินจะแจ้งผลให้ทราบเร็วๆ นี้")).Do()
+		return
+	}
+
 	switch text {
 	case "ลงทะเบียน", "register", "Register":
 		s.handleRegisterStart(event)

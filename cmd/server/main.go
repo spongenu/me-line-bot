@@ -47,6 +47,7 @@ func main() {
 	webhookHandler := handler.NewWebhookHandler(bot, checkinSvc)
 	authHandler := handler.NewAuthHandler(db, cfg)
 	adminHandler := handler.NewAdminHandler(db, cfg, bot)
+	userHandler := handler.NewUserHandler(db)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/webhook", webhookHandler.Handle)
@@ -60,6 +61,8 @@ func main() {
 
 	// Admin API (Protected by JWT)
 	requireAdmin := middleware.RequireAdmin(cfg.JWTSecret)
+	requireAuth := middleware.RequireAuth(cfg.JWTSecret)
+	mux.Handle("/api/user/leave-requests", requireAuth(http.HandlerFunc(userHandler.CreateLeaveRequestHandler)))
 	mux.Handle("/api/admin/users", requireAdmin(http.HandlerFunc(adminHandler.GetUsersHandler)))
 	mux.Handle("/api/admin/users/role", requireAdmin(http.HandlerFunc(adminHandler.UpdateUserRoleHandler)))
 	mux.Handle("/api/admin/attendances", requireAdmin(http.HandlerFunc(adminHandler.GetAttendancesHandler)))

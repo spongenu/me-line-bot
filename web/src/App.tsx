@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Users from './pages/Users';
 import Attendances from './pages/Attendances';
 import Leaves from './pages/Leaves';
+import EmployeeLeave from './pages/EmployeeLeave';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
@@ -31,6 +32,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/leave" element={<EmployeeLeave />} />
           <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
