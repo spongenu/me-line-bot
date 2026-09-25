@@ -150,10 +150,14 @@ export default function Users() {
             <tbody className="divide-y divide-gray-100">
               {users.filter(user => {
                 if (roleFilter === 'all') return true;
-                const roleName = user.UserRoles && user.UserRoles.length > 0 ? user.UserRoles[0].Role.Name : 'customer';
-                return roleName === roleFilter;
+                const userRoles = user.UserRoles && user.UserRoles.length > 0 
+                  ? user.UserRoles.map(ur => ur.Role.Name) 
+                  : ['customer'];
+                return userRoles.includes(roleFilter);
               }).map((user) => {
-                const roleName = user.UserRoles && user.UserRoles.length > 0 ? user.UserRoles[0].Role.Name : 'customer';
+                const userRoles = user.UserRoles && user.UserRoles.length > 0 
+                  ? user.UserRoles.map(ur => ur.Role.Name) 
+                  : ['customer'];
                 
                 return (
                   <tr key={user.ID} className="hover:bg-gray-50 transition-colors">
@@ -173,13 +177,17 @@ export default function Users() {
                       </div>
                     </td>
                     <td className="p-4">
-                      <span className={`px-3 py-1 text-xs font-bold rounded-full ${
-                        roleName === 'admin' ? 'bg-purple-100 text-purple-700' :
-                        roleName === 'staff' ? 'bg-green-100 text-green-700' :
-                        'bg-gray-100 text-gray-600'
-                      }`}>
-                        {roleName.toUpperCase()}
-                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {userRoles.map((roleName, idx) => (
+                          <span key={idx} className={`px-3 py-1 text-[10px] font-bold rounded-full ${
+                            roleName === 'admin' ? 'bg-purple-100 text-purple-700' :
+                            roleName === 'staff' ? 'bg-green-100 text-green-700' :
+                            'bg-gray-100 text-gray-600'
+                          }`}>
+                            {roleName.toUpperCase()}
+                          </span>
+                        ))}
+                      </div>
                     </td>
                     <td className="p-4 text-right">
                       <button 
@@ -189,7 +197,7 @@ export default function Users() {
                         <Calendar size={16} className="mr-1" /> วันทำงาน
                       </button>
                       <button 
-                        onClick={() => changeRole(user.ID, roleName)}
+                        onClick={() => changeRole(user.ID, userRoles[0])}
                         className="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-1.5 rounded-lg transition-colors"
                       >
                         สลับสิทธิ์
