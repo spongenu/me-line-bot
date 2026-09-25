@@ -38,7 +38,7 @@ export default function Dashboard() {
 
       const totalUsers = users.filter((u: any) => {
         const roles = u.UserRoles && u.UserRoles.length > 0 ? u.UserRoles.map((ur: any) => ur.Role.Name) : ['customer'];
-        return roles.includes('staff') || roles.includes('admin');
+        return roles.includes('staff');
       }).length;
       const pendingLeaves = leaves.filter((l: any) => l.Status === 'pending').length;
       
