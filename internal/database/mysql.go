@@ -36,6 +36,10 @@ func Connect(cfg *config.Config) *gorm.DB {
 		&model.User{},
 		&model.UserRole{},
 		&model.Attendance{},
+		&model.LeaveQuota{},
+		&model.LeaveRequest{},
+		&model.UserSchedule{},
+		&model.SystemSetting{},
 	); err != nil {
 		log.Fatal("Failed to migrate database:", err)
 	}

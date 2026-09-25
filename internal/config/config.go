@@ -16,6 +16,8 @@ type Config struct {
 	DBUser            string
 	DBPassword        string
 	DBName            string
+	LineLoginClientID string
+	JWTSecret         string
 }
 
 func Load() *Config {
@@ -32,6 +34,8 @@ func Load() *Config {
 		DBUser:            getEnv("DB_USER", "mebot"),
 		DBPassword:        getEnv("DB_PASSWORD", ""),
 		DBName:            getEnv("DB_NAME", "mebot_db"),
+		LineLoginClientID: getEnv("LINE_LOGIN_CLIENT_ID", ""),
+		JWTSecret:         getEnv("JWT_SECRET", "super-secret-key-change-in-prod"),
 	}
 }
 

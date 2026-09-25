@@ -90,3 +90,12 @@ func (r *UserRepository) UpdateProfile(userID uint, displayName, pictureURL stri
 func (r *UserRepository) FindAllActive(users *[]model.User) error {
 	return r.db.Where("is_active = ?", true).Find(users).Error
 }
+
+func (r *UserRepository) IsSystemOpen() bool {
+	var status model.SystemSetting
+	err := r.db.Where(model.SystemSetting{KeyName: "system_open"}).FirstOrCreate(&status, model.SystemSetting{KeyName: "system_open", Value: "true"}).Error
+	if err != nil {
+		return true // Default to open if error
+	}
+	return status.Value == "true"
+}

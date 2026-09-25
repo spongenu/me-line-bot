@@ -56,3 +56,46 @@ type Attendance struct {
 	WorkDate        string `gorm:"size:10;not null;index:idx_user_date"`
 	CreatedAt       time.Time
 }
+
+type LeaveQuota struct {
+	ID        uint   `gorm:"primaryKey;autoIncrement"`
+	UserID    uint   `gorm:"not null;uniqueIndex:idx_user_leavetype"`
+	User      User   `gorm:"foreignKey:UserID"`
+	LeaveType string `gorm:"size:50;not null;uniqueIndex:idx_user_leavetype"` // e.g. sick, personal, annual
+	TotalDays int    `gorm:"default:0"`
+	UsedDays  int    `gorm:"default:0"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type LeaveRequest struct {
+	ID         uint   `gorm:"primaryKey;autoIncrement"`
+	UserID     uint   `gorm:"not null"`
+	User       User   `gorm:"foreignKey:UserID"`
+	LeaveType  string `gorm:"size:50;not null"`
+	StartDate  string `gorm:"size:10;not null"` // YYYY-MM-DD
+	EndDate    string `gorm:"size:10;not null"` // YYYY-MM-DD
+	Reason     string `gorm:"size:255"`
+	Status     string `gorm:"size:20;default:'pending'"` // pending, approved, rejected
+	ApprovedBy *uint  // User ID who approved/rejected
+	Approver   *User  `gorm:"foreignKey:ApprovedBy"`
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+}
+
+type UserSchedule struct {
+	ID            uint      `gorm:"primarykey"`
+	UserID        uint      `gorm:"not null;index"`
+	WorkingDays   string    `gorm:"type:varchar(30);not null"` // e.g., "1,2,3,4,5" (0=Sun, 1=Mon)
+	EffectiveFrom time.Time `gorm:"type:date;not null;index"`
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	User          User `gorm:"foreignKey:UserID"`
+}
+
+type SystemSetting struct {
+	ID        uint   `gorm:"primarykey"`
+	KeyName   string `gorm:"type:varchar(50);unique;not null"`
+	Value     string `gorm:"type:varchar(255)"`
+	UpdatedAt time.Time
+}

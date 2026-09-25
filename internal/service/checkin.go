@@ -204,6 +204,12 @@ func (s *CheckinService) handleCheckinRequest(event *linebot.Event) {
 		return
 	}
 
+	// Check if system is open
+	if !s.userRepo.IsSystemOpen() {
+		s.replyText(event.ReplyToken, "ขออภัยค่ะ วันนี้ร้านปิดระบบชั่วคราว ไม่สามารถเช็คอินได้ค่ะ 🔒")
+		return
+	}
+
 	today := time.Now().In(bangkokTZ()).Format("2006-01-02")
 	att, _ := s.attRepo.FindTodayByUser(user.ID, today)
 	if att != nil {
