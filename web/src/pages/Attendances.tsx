@@ -107,7 +107,10 @@ export default function Attendances() {
               className="text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-800 w-full"
             >
               <option value="">-- ดูทุกคน --</option>
-              {users.map(u => (
+              {users.filter(u => {
+                const roles = u.UserRoles && u.UserRoles.length > 0 ? u.UserRoles.map(ur => ur.Role.Name) : ['customer'];
+                return roles.includes('staff') || roles.includes('admin');
+              }).map(u => (
                 <option key={u.ID} value={u.ID}>{u.DisplayName || u.Name}</option>
               ))}
             </select>
