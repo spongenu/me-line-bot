@@ -280,7 +280,7 @@ export default function Attendances() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {displayRows.map((row, idx) => {
+              {displayRows.map((row) => {
                 if (row.type === 'attendance') {
                   const att = row.att;
                   const checkIn = new Date(att.CheckInTime).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
