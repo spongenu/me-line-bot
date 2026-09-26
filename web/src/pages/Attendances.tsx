@@ -77,6 +77,21 @@ export default function Attendances() {
   const totalMinutes = attendances.reduce((acc, curr) => acc + curr.WorkDurationMin, 0);
   const totalHours = (totalMinutes / 60).toFixed(1);
 
+  // คำนวณเวลาเช็คอินเฉลี่ย
+  let totalCheckInMinutes = 0;
+  let checkInCount = 0;
+  attendances.forEach(att => {
+    if (att.CheckInTime) {
+      const d = new Date(att.CheckInTime);
+      totalCheckInMinutes += (d.getHours() * 60) + d.getMinutes();
+      checkInCount++;
+    }
+  });
+  const avgCheckInMinutes = checkInCount > 0 ? Math.round(totalCheckInMinutes / checkInCount) : 0;
+  const avgCheckInTime = checkInCount > 0 
+    ? String(Math.floor(avgCheckInMinutes / 60)).padStart(2, '0') + ':' + String(avgCheckInMinutes % 60).padStart(2, '0') + ' น.' 
+    : '-';
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
@@ -121,9 +136,15 @@ export default function Attendances() {
 
       {selectedUserId && (
         <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-center justify-between">
-            <div>
-                <p className="text-sm text-blue-800 font-medium">สรุปเวลาทำงานเดือน {selectedMonth}</p>
-                <p className="text-2xl font-bold text-blue-900 mt-1">{totalHours} <span className="text-sm font-normal">ชั่วโมง</span></p>
+            <div className="flex gap-16">
+              <div>
+                  <p className="text-sm text-blue-800 font-medium">สรุปเวลาทำงานเดือน {selectedMonth}</p>
+                  <p className="text-2xl font-bold text-blue-900 mt-1">{totalHours} <span className="text-sm font-normal">ชั่วโมง</span></p>
+              </div>
+              <div>
+                  <p className="text-sm text-blue-800 font-medium">เวลาเข้างานเฉลี่ย</p>
+                  <p className="text-2xl font-bold text-blue-900 mt-1">{avgCheckInTime}</p>
+              </div>
             </div>
         </div>
       )}
