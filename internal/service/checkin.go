@@ -158,8 +158,10 @@ func (s *CheckinService) HandleLocation(event *linebot.Event, lat, lng float64) 
 			return
 		}
 		s.replyText(event.ReplyToken, fmt.Sprintf("✅ เช็คอินสำเร็จ!\n🕐 เวลา: %s น.", timeStr))
-		s.pushToGroup(shop.LineGroupID,
-			fmt.Sprintf("✅ เช็คอิน\n👤 %s\n🕐 เวลา: %s น.\n🏪 %s", user.DisplayName, timeStr, shop.Name))
+		if s.userRepo.IsSystemOpen() {
+			s.pushToGroup(shop.LineGroupID,
+				fmt.Sprintf("✅ เช็คอิน\n👤 %s\n🕐 เวลา: %s น.\n🏪 %s", user.DisplayName, timeStr, shop.Name))
+		}
 	} else {
 		att, err := s.attRepo.FindLatestOpenByUser(user.ID)
 		if err != nil || att == nil {
@@ -191,9 +193,11 @@ func (s *CheckinService) HandleLocation(event *linebot.Event, lat, lng float64) 
 		s.replyText(event.ReplyToken,
 			fmt.Sprintf("✅ เช็คเอาท์สำเร็จ!\n🕔 เวลาออก: %s%s\n⏱ ทำงานรวม: %d ชม. %d นาที",
 				timeStr, nextDayMark, hours, mins))
-		s.pushToGroup(shop.LineGroupID,
-			fmt.Sprintf("🔴 เช็คเอาท์\n👤 %s\n🕗 เข้างาน: %s น.\n🕔 ออกงาน: %s%s\n⏱ รวม: %d ชม. %d นาที\n🏪 %s",
-				user.DisplayName, checkInStr, timeStr, nextDayMark, hours, mins, shop.Name))
+		if s.userRepo.IsSystemOpen() {
+			s.pushToGroup(shop.LineGroupID,
+				fmt.Sprintf("🔴 เช็คเอาท์\n👤 %s\n🕗 เข้างาน: %s น.\n🕔 ออกงาน: %s%s\n⏱ รวม: %d ชม. %d นาที\n🏪 %s",
+					user.DisplayName, checkInStr, timeStr, nextDayMark, hours, mins, shop.Name))
+		}
 	}
 }
 
@@ -209,11 +213,7 @@ func (s *CheckinService) handleCheckinRequest(event *linebot.Event) {
 		return
 	}
 
-	// Check if system is open
-	if !s.userRepo.IsSystemOpen() {
-		s.replyText(event.ReplyToken, "ขออภัยค่ะ วันนี้ร้านปิดระบบชั่วคราว ไม่สามารถเช็คอินได้ค่ะ 🔒")
-		return
-	}
+
 
 	today := time.Now().In(bangkokTZ()).Format("2006-01-02")
 	att, _ := s.attRepo.FindTodayByUser(user.ID, today)

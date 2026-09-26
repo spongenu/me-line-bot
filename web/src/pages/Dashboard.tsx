@@ -120,7 +120,7 @@ export default function Dashboard() {
             <span className="text-sm font-bold text-gray-800 bg-gray-100 px-2 py-1 rounded">{data.lineQuota} / 200</span>
           </div>
           <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-500 font-medium">สถานะรับเช็คอิน:</span>
+            <span className="text-sm text-gray-500 font-medium">แจ้งเตือนลงกลุ่ม:</span>
             <button 
               onClick={toggleSystem}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${data.systemOpen ? 'bg-green-500' : 'bg-red-500'}`}
