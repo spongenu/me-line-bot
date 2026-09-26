@@ -138,76 +138,74 @@ export default function Users() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="p-4 font-semibold text-gray-600 text-sm">ผู้ใช้งาน</th>
-                <th className="p-4 font-semibold text-gray-600 text-sm">สิทธิ์ (Role)</th>
-                <th className="p-4 font-semibold text-gray-600 text-sm text-right">จัดการ</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {users.filter(user => {
-                if (roleFilter === 'all') return true;
-                const userRoles = user.UserRoles && user.UserRoles.length > 0 
-                  ? user.UserRoles.map(ur => ur.Role.Name) 
-                  : ['customer'];
-                return userRoles.includes(roleFilter);
-              }).map((user) => {
-                const userRoles = user.UserRoles && user.UserRoles.length > 0 
-                  ? user.UserRoles.map(ur => ur.Role.Name) 
-                  : ['customer'];
-                
-                return (
-                  <tr key={user.ID} className="hover:bg-gray-50 transition-colors">
-                    <td className="p-4">
-                      <div className="flex items-center space-x-3">
-                        {user.PictureURL ? (
-                          <img src={user.PictureURL} alt="" className="w-10 h-10 rounded-full" />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs">
-                            {user.DisplayName?.charAt(0) || user.Name.charAt(0) || '?'}
-                          </div>
-                        )}
-                        <div>
-                          <p className="font-bold text-gray-800">{user.DisplayName || user.Name}</p>
-                          <p className="text-xs text-gray-400">ID: {user.ID} | {user.LineUserID.substring(0, 10)}...</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex flex-wrap gap-1.5">
-                        {userRoles.map((roleName, idx) => (
-                          <span key={idx} className={`px-3 py-1 text-[10px] font-bold rounded-full ${
-                            roleName === 'admin' ? 'bg-purple-100 text-purple-700' :
-                            roleName === 'staff' ? 'bg-green-100 text-green-700' :
-                            'bg-gray-100 text-gray-600'
-                          }`}>
-                            {roleName.toUpperCase()}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="p-4 text-right">
-                      <button 
-                        onClick={() => openScheduleModal(user)}
-                        className="text-indigo-600 hover:text-indigo-800 text-sm font-medium bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors mr-2 inline-flex items-center"
-                      >
-                        <Calendar size={16} className="mr-1" /> วันทำงาน
-                      </button>
-                      <button 
-                        onClick={() => changeRole(user.ID, userRoles[0])}
-                        className="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-1.5 rounded-lg transition-colors"
-                      >
-                        สลับสิทธิ์
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        {/* Desktop Header */}
+        <div className="hidden md:grid grid-cols-12 gap-4 p-4 bg-gray-50 border-b border-gray-100">
+          <div className="col-span-5 font-semibold text-gray-600 text-sm">ผู้ใช้งาน</div>
+          <div className="col-span-3 font-semibold text-gray-600 text-sm">สิทธิ์ (Role)</div>
+          <div className="col-span-4 font-semibold text-gray-600 text-sm text-right">จัดการ</div>
+        </div>
+
+        {/* User List */}
+        <div className="divide-y divide-gray-100">
+          {users.filter(user => {
+            if (roleFilter === 'all') return true;
+            const userRoles = user.UserRoles && user.UserRoles.length > 0 
+              ? user.UserRoles.map(ur => ur.Role.Name) 
+              : ['customer'];
+            return userRoles.includes(roleFilter);
+          }).map((user) => {
+            const userRoles = user.UserRoles && user.UserRoles.length > 0 
+              ? user.UserRoles.map(ur => ur.Role.Name) 
+              : ['customer'];
+            
+            return (
+              <div key={user.ID} className="flex flex-col md:grid md:grid-cols-12 gap-4 p-4 hover:bg-gray-50 transition-colors md:items-center">
+                {/* User Info */}
+                <div className="col-span-5 flex items-center space-x-3">
+                  {user.PictureURL ? (
+                    <img src={user.PictureURL} alt="" className="w-10 h-10 rounded-full" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs">
+                      {user.DisplayName?.charAt(0) || user.Name.charAt(0) || '?'}
+                    </div>
+                  )}
+                  <div>
+                    <p className="font-bold text-gray-800">{user.DisplayName || user.Name}</p>
+                    <p className="text-xs text-gray-400">ID: {user.ID} | {user.LineUserID.substring(0, 10)}...</p>
+                  </div>
+                </div>
+
+                {/* Roles */}
+                <div className="col-span-3 flex flex-wrap gap-1.5 mt-2 md:mt-0">
+                  {userRoles.map((roleName, idx) => (
+                    <span key={idx} className={`px-3 py-1 text-[10px] font-bold rounded-full ${
+                      roleName === 'admin' ? 'bg-purple-100 text-purple-700' :
+                      roleName === 'staff' ? 'bg-green-100 text-green-700' :
+                      'bg-gray-100 text-gray-600'
+                    }`}>
+                      {roleName.toUpperCase()}
+                    </span>
+                  ))}
+                </div>
+
+                {/* Actions */}
+                <div className="col-span-4 flex flex-wrap gap-2 mt-3 md:mt-0 md:justify-end">
+                  <button 
+                    onClick={() => openScheduleModal(user)}
+                    className="text-indigo-600 hover:text-indigo-800 text-sm font-medium bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center flex-1 md:flex-none justify-center"
+                  >
+                    <Calendar size={16} className="mr-1" /> วันทำงาน
+                  </button>
+                  <button 
+                    onClick={() => changeRole(user.ID, userRoles[0])}
+                    className="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-1.5 rounded-lg transition-colors flex-1 md:flex-none justify-center"
+                  >
+                    สลับสิทธิ์
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
