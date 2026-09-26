@@ -141,7 +141,8 @@ func (h *AdminHandler) UpdateAttendanceHandler(w http.ResponseWriter, r *http.Re
 	}
 
 	var reqBody struct {
-		CheckOutTime string `json:"check_out_time"` // ISO8601 format
+		CheckInTime  *string `json:"check_in_time"`
+		CheckOutTime *string `json:"check_out_time"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
 		http.Error(w, "Bad request", http.StatusBadRequest)
@@ -154,18 +155,34 @@ func (h *AdminHandler) UpdateAttendanceHandler(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	t, err := time.Parse(time.RFC3339, reqBody.CheckOutTime)
-	if err != nil {
-		http.Error(w, "Invalid time format (use RFC3339)", http.StatusBadRequest)
-		return
+	if reqBody.CheckInTime != nil && *reqBody.CheckInTime != "" {
+		tIn, err := time.Parse(time.RFC3339, *reqBody.CheckInTime)
+		if err == nil {
+			att.CheckInTime = &tIn
+		} else {
+			http.Error(w, "Invalid check_in_time format (use RFC3339)", http.StatusBadRequest)
+			return
+		}
 	}
 
-	att.CheckOutTime = &t
+	if reqBody.CheckOutTime != nil && *reqBody.CheckOutTime != "" {
+		tOut, err := time.Parse(time.RFC3339, *reqBody.CheckOutTime)
+		if err == nil {
+			att.CheckOutTime = &tOut
+		} else {
+			http.Error(w, "Invalid check_out_time format (use RFC3339)", http.StatusBadRequest)
+			return
+		}
+	} else if reqBody.CheckOutTime != nil && *reqBody.CheckOutTime == "" {
+		att.CheckOutTime = nil
+	}
 
 	// Recalculate duration
-	if att.CheckInTime != nil {
-		duration := t.Sub(*att.CheckInTime)
+	if att.CheckInTime != nil && att.CheckOutTime != nil {
+		duration := att.CheckOutTime.Sub(*att.CheckInTime)
 		att.WorkDurationMin = int(duration.Minutes())
+	} else {
+		att.WorkDurationMin = 0
 	}
 
 	if err := h.DB.Save(&att).Error; err != nil {

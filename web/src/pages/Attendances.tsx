@@ -24,7 +24,15 @@ export default function Attendances() {
   
   // Default to current month (YYYY-MM)
   const currentMonth = new Date().toISOString().slice(0, 7);
-  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+  const [selectedMonth, setSelectedMonth] = useState(
+    `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
+  );
+
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editAttId, setEditAttId] = useState<number | null>(null);
+  const [editCheckIn, setEditCheckIn] = useState('');
+  const [editCheckOut, setEditCheckOut] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState('');
 
   const fetchUsers = async () => {
@@ -60,16 +68,43 @@ export default function Attendances() {
     fetchAttendances();
   }, [selectedMonth, selectedUserId]);
 
-  const handleForceCheckout = async (id: number) => {
-    const outTimeStr = prompt('กรุณาระบุเวลาออกงาน ตัวอย่างรูปแบบ:\n2026-09-25T23:00:00Z');
-    if (!outTimeStr) return;
+  const toLocalIsoString = (dateStr: string) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
 
+  const openEditModal = (att: any) => {
+    setEditAttId(att.ID);
+    setEditCheckIn(toLocalIsoString(att.CheckInTime));
+    setEditCheckOut(att.CheckOutTime ? toLocalIsoString(att.CheckOutTime) : '');
+    setIsEditModalOpen(true);
+  };
+
+  const saveAttendanceEdit = async () => {
+    if (!editAttId) return;
+    setSavingEdit(true);
     try {
-      await api.put(`/admin/attendances/update?id=${id}`, { check_out_time: outTimeStr });
-      alert('บันทึกเวลาออกสำเร็จ!');
+      const payload: any = {};
+      
+      if (editCheckIn) {
+        payload.check_in_time = new Date(editCheckIn).toISOString();
+      }
+      
+      if (editCheckOut) {
+        payload.check_out_time = new Date(editCheckOut).toISOString();
+      } else {
+        payload.check_out_time = "";
+      }
+
+      await api.put(`/admin/attendances/update?id=${editAttId}`, payload);
+      setIsEditModalOpen(false);
       fetchAttendances();
     } catch (err) {
-      alert('เกิดข้อผิดพลาด กรุณาตรวจสอบรูปแบบเวลา (ต้องเป็น RFC3339 เช่น 2026-09-25T23:00:00Z)');
+      alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -184,14 +219,12 @@ export default function Attendances() {
                     </td>
                     <td className="p-4 text-sm font-medium text-gray-600">{duration} ชม.</td>
                     <td className="p-4 text-right">
-                      {!att.CheckOutTime && (
                         <button 
-                          onClick={() => handleForceCheckout(att.ID)}
+                          onClick={() => openEditModal(att)}
                           className="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-1.5 rounded-lg transition-colors"
                         >
                           แก้ไขเวลา
                         </button>
-                      )}
                     </td>
                   </tr>
                 );
@@ -211,6 +244,55 @@ export default function Attendances() {
           </table>
         </div>
       </div>
+
+      {isEditModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-gray-100">
+              <h3 className="text-xl font-bold text-gray-800">แก้ไขเวลาเข้า-ออกงาน</h3>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">เวลาเข้างาน (Check-in)</label>
+                <input 
+                  type="datetime-local" 
+                  value={editCheckIn}
+                  onChange={(e) => setEditCheckIn(e.target.value)}
+                  className="w-full text-sm border border-gray-300 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">เวลาออกงาน (Check-out)</label>
+                <input 
+                  type="datetime-local" 
+                  value={editCheckOut}
+                  onChange={(e) => setEditCheckOut(e.target.value)}
+                  className="w-full text-sm border border-gray-300 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <p className="text-xs text-gray-400 mt-1">ปล่อยว่างได้ หากยังไม่เช็คเอาท์</p>
+              </div>
+            </div>
+            
+            <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end space-x-3">
+              <button 
+                onClick={() => setIsEditModalOpen(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                ยกเลิก
+              </button>
+              <button 
+                onClick={saveAttendanceEdit}
+                disabled={savingEdit}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {savingEdit ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
