@@ -20,6 +20,8 @@ interface Attendance {
 export default function Attendances() {
   const [attendances, setAttendances] = useState<Attendance[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [schedules, setSchedules] = useState<any[]>([]);
+  const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
   const [selectedMonth, setSelectedMonth] = useState(
@@ -45,14 +47,18 @@ export default function Attendances() {
   const fetchAttendances = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (selectedMonth) params.append('month', selectedMonth);
-      if (selectedUserId) params.append('user_id', selectedUserId);
-      
-      const res = await api.get(`/admin/attendances?${params.toString()}`);
-      setAttendances(res.data || []);
-    } catch (err) {
-      console.error('Error fetching attendances:', err);
+      const [resAtt, resUsers, resSched, resLeave] = await Promise.all([
+        api.get(`/admin/attendances?month=${selectedMonth}${selectedUserId ? `&user_id=${selectedUserId}` : ''}`),
+        api.get('/admin/users'),
+        api.get('/admin/schedules'),
+        api.get('/admin/leave-requests')
+      ]);
+      setAttendances(resAtt.data || []);
+      setUsers(resUsers.data || []);
+      setSchedules(resSched.data || []);
+      setLeaveRequests(resLeave.data || []);
+    } catch (error) {
+      console.error('Failed to fetch data:', error);
     } finally {
       setLoading(false);
     }
@@ -124,6 +130,84 @@ export default function Attendances() {
   const avgCheckInTime = checkInCount > 0 
     ? String(Math.floor(avgCheckInMinutes / 60)).padStart(2, '0') + ':' + String(avgCheckInMinutes % 60).padStart(2, '0') + ' น.' 
     : '-';
+
+  const getDisplayRows = () => {
+    if (loading) return [];
+    
+    // Start with actual attendances
+    const rows: any[] = attendances.map(a => ({
+      type: 'attendance',
+      dateStr: a.CheckInTime ? a.CheckInTime.substring(0, 10) : a.WorkDate,
+      user: a.User,
+      att: a
+    }));
+
+    // Generate absences
+    const staffUsers = users.filter(u => {
+      const roles = u.UserRoles && u.UserRoles.length > 0 ? u.UserRoles.map((ur: any) => ur.Role.Name) : ['customer'];
+      return roles.includes('staff') && (!selectedUserId || String(u.ID) === selectedUserId);
+    });
+
+    const [year, month] = selectedMonth.split('-');
+    const daysInMonth = new Date(parseInt(year), parseInt(month), 0).getDate();
+    
+    const todayStr = new Date().toISOString().substring(0, 10);
+    const endDay = selectedMonth === todayStr.substring(0, 7) ? new Date().getDate() : daysInMonth;
+
+    staffUsers.forEach(user => {
+      // Find user schedules
+      const userScheds = schedules.filter(s => s.UserID === user.ID).sort((a, b) => new Date(b.EffectiveFrom).getTime() - new Date(a.EffectiveFrom).getTime());
+      if (userScheds.length === 0) return; // No schedule set
+
+      // Find user leaves
+      const userLeaves = leaveRequests.filter(l => l.UserID === user.ID && l.Status === 'approved');
+
+      for (let day = 1; day <= endDay; day++) {
+        const dateStr = `${year}-${month}-${String(day).padStart(2, '0')}`;
+        
+        // Is there an attendance?
+        if (rows.find(r => r.dateStr === dateStr && r.user.ID === user.ID)) continue;
+
+        // Is there a leave?
+        const isLeave = userLeaves.find(l => {
+           const start = l.StartDate.substring(0, 10);
+           const end = l.EndDate.substring(0, 10);
+           return dateStr >= start && dateStr <= end;
+        });
+        if (isLeave) {
+          rows.push({
+            type: 'leave',
+            dateStr: dateStr,
+            user: user,
+            leave: isLeave
+          });
+          continue;
+        }
+
+        // Determine if it's a scheduled work day
+        const dateObj = new Date(dateStr);
+        const dayOfWeek = dateObj.getDay(); // 0=Sun, 1=Mon
+        
+        const activeSched = userScheds.find(s => dateStr >= s.EffectiveFrom.substring(0, 10));
+        if (activeSched && activeSched.WorkingDays) {
+          const workingDays = activeSched.WorkingDays.split(',').map(Number);
+          if (workingDays.includes(dayOfWeek)) {
+            rows.push({
+              type: 'absent',
+              dateStr: dateStr,
+              user: user
+            });
+          }
+        }
+      }
+    });
+
+    // Sort by date descending
+    return rows.sort((a, b) => b.dateStr.localeCompare(a.dateStr));
+  };
+
+  const displayRows = getDisplayRows();
+
 
   return (
     <div className="space-y-6">

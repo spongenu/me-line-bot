@@ -262,14 +262,13 @@ func (h *AdminHandler) GetUserScheduleHandler(w http.ResponseWriter, r *http.Req
 	}
 
 	userIDStr := r.URL.Query().Get("user_id")
-	if userIDStr == "" {
-		http.Error(w, "Missing user_id", http.StatusBadRequest)
-		return
-	}
 
 	var schedules []model.UserSchedule
-	// Get all schedules for the user, ordered by EffectiveFrom descending
-	if err := h.DB.Where("user_id = ?", userIDStr).Order("effective_from desc").Find(&schedules).Error; err != nil {
+	query := h.DB.Order("effective_from desc")
+	if userIDStr != "" {
+		query = query.Where("user_id = ?", userIDStr)
+	}
+	if err := query.Find(&schedules).Error; err != nil {
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}
