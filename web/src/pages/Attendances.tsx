@@ -280,41 +280,71 @@ export default function Attendances() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {attendances.map((att) => {
-                const checkIn = new Date(att.CheckInTime).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
-                const checkOut = att.CheckOutTime 
-                    ? new Date(att.CheckOutTime).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
-                    : '-';
-                const duration = att.WorkDurationMin > 0 ? (att.WorkDurationMin / 60).toFixed(1) : '-';
+              {displayRows.map((row, idx) => {
+                if (row.type === 'attendance') {
+                  const att = row.att;
+                  const checkIn = new Date(att.CheckInTime).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+                  const checkOut = att.CheckOutTime 
+                      ? new Date(att.CheckOutTime).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
+                      : '-';
+                  const duration = att.WorkDurationMin > 0 ? (att.WorkDurationMin / 60).toFixed(1) : '-';
 
-                return (
-                  <tr key={att.ID} className="hover:bg-gray-50 transition-colors">
-                    <td className="p-4 text-sm font-medium text-gray-700">{att.WorkDate}</td>
-                    <td className="p-4 text-sm font-bold text-gray-800">{att.User?.DisplayName || att.User?.Name}</td>
-                    <td className="p-4 text-sm text-green-600 font-medium">{checkIn}</td>
-                    <td className="p-4 text-sm">
-                      {att.CheckOutTime ? (
-                        <span className="text-gray-600">{checkOut}</span>
-                      ) : (
-                        <span className="text-red-500 font-semibold bg-red-50 px-2 py-1 rounded">ลืมเช็คเอาท์</span>
-                      )}
-                    </td>
-                    <td className="p-4 text-sm font-medium text-gray-600">{duration} ชม.</td>
-                    <td className="p-4 text-right">
-                        <button 
-                          onClick={() => openEditModal(att)}
-                          className="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-1.5 rounded-lg transition-colors"
-                        >
-                          แก้ไขเวลา
-                        </button>
-                    </td>
-                  </tr>
-                );
+                  return (
+                    <tr key={`att-${att.ID}`} className="hover:bg-gray-50 transition-colors">
+                      <td className="p-4 text-gray-800">{row.dateStr}</td>
+                      <td className="p-4 font-semibold text-gray-800 flex items-center gap-2">
+                          {row.user?.DisplayName || row.user?.Name || 'Unknown'}
+                      </td>
+                      <td className="p-4 text-green-600 font-medium">{checkIn}</td>
+                      <td className="p-4 text-red-500 font-medium">{att.CheckOutTime ? checkOut : <span className="bg-red-50 text-red-500 px-2 py-1 rounded text-xs">ลืมเช็คเอาท์</span>}</td>
+                      <td className="p-4 text-gray-600 font-medium">{duration} ชม.</td>
+                      <td className="p-4 text-right">
+                          <button 
+                            onClick={() => openEditModal(att)}
+                            className="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-1.5 rounded-lg transition-colors"
+                          >
+                            แก้ไขเวลา
+                          </button>
+                      </td>
+                    </tr>
+                  );
+                } else if (row.type === 'absent') {
+                  return (
+                    <tr key={`absent-${row.user.ID}-${row.dateStr}`} className="hover:bg-red-50 bg-red-50/30 transition-colors">
+                      <td className="p-4 text-gray-800">{row.dateStr}</td>
+                      <td className="p-4 font-semibold text-gray-800 flex items-center gap-2">
+                          {row.user?.DisplayName || row.user?.Name || 'Unknown'}
+                      </td>
+                      <td className="p-4 text-red-600 font-bold" colSpan={3}>
+                        ❌ ขาดงาน (Absent)
+                      </td>
+                      <td className="p-4 text-right">
+                          <span className="text-xs text-gray-400">ไม่มีข้อมูลบันทึก</span>
+                      </td>
+                    </tr>
+                  );
+                } else if (row.type === 'leave') {
+                  return (
+                    <tr key={`leave-${row.user.ID}-${row.dateStr}`} className="hover:bg-orange-50 bg-orange-50/40 transition-colors">
+                      <td className="p-4 text-gray-800">{row.dateStr}</td>
+                      <td className="p-4 font-semibold text-gray-800 flex items-center gap-2">
+                          {row.user?.DisplayName || row.user?.Name || 'Unknown'}
+                      </td>
+                      <td className="p-4 text-orange-600 font-bold" colSpan={3}>
+                        🏖 ลางาน ({row.leave.LeaveType})
+                      </td>
+                      <td className="p-4 text-right">
+                          <span className="text-xs text-gray-400">ลางาน</span>
+                      </td>
+                    </tr>
+                  );
+                }
+                return null;
               })}
               
-              {!loading && attendances.length === 0 && (
+              {!loading && displayRows.length === 0 && (
                  <tr>
-                    <td colSpan={6} className="p-8 text-center text-gray-500">ไม่มีประวัติเข้าออกงานในเงื่อนไขที่เลือก</td>
+                    <td colSpan={6} className="p-8 text-center text-gray-500">ไม่มีข้อมูลในเงื่อนไขที่เลือก</td>
                  </tr>
               )}
               {loading && (
