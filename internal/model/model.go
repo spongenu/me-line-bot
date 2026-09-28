@@ -59,9 +59,10 @@ type Attendance struct {
 
 type LeaveQuota struct {
 	ID        uint   `gorm:"primaryKey;autoIncrement"`
-	UserID    uint   `gorm:"not null;uniqueIndex:idx_user_leavetype"`
+	UserID    uint   `gorm:"not null;uniqueIndex:idx_user_leavetype_year"`
 	User      User   `gorm:"foreignKey:UserID"`
-	LeaveType string `gorm:"size:50;not null;uniqueIndex:idx_user_leavetype"` // e.g. sick, personal, annual
+	LeaveType string `gorm:"size:50;not null;uniqueIndex:idx_user_leavetype_year"` // e.g. ลาป่วย, ลากิจ, ลาพักร้อน
+	Year      int    `gorm:"not null;uniqueIndex:idx_user_leavetype_year"`
 	TotalDays int    `gorm:"default:0"`
 	UsedDays  int    `gorm:"default:0"`
 	CreatedAt time.Time

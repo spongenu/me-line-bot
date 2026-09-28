@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
-import { Calendar } from 'lucide-react';
+import { Calendar, Briefcase } from 'lucide-react';
 
 interface Role {
   Name: string;
@@ -24,12 +24,24 @@ export default function Users() {
   const [loading, setLoading] = useState(true);
   const [roleFilter, setRoleFilter] = useState('staff');
 
-  // Modal State
+  // Schedule Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [workingDays, setWorkingDays] = useState<number[]>([1, 2, 3, 4, 5]); // จ-ศ (0=Sun, 1=Mon...)
   const [effectiveDate, setEffectiveDate] = useState(new Date().toISOString().split('T')[0]);
   const [savingSchedule, setSavingSchedule] = useState(false);
+
+  // Quota Modal State
+  const [isQuotaModalOpen, setIsQuotaModalOpen] = useState(false);
+  const [quotaUser, setQuotaUser] = useState<User | null>(null);
+  const [quotaYear, setQuotaYear] = useState<number>(new Date().getFullYear());
+  const [userQuotas, setUserQuotas] = useState<{ [key: string]: number }>({
+    'ลาป่วย': 30,
+    'ลากิจ': 3,
+    'ลาพักร้อน': 6,
+  });
+  const [usedDaysMap, setUsedDaysMap] = useState<{ [key: string]: number }>({});
+  const [savingQuota, setSavingQuota] = useState(false);
 
   const fetchUsers = async () => {
     try {
@@ -110,6 +122,60 @@ export default function Users() {
     }
   };
 
+  const openQuotaModal = async (user: User) => {
+    setQuotaUser(user);
+    setIsQuotaModalOpen(true);
+    await fetchUserQuotas(user.ID, quotaYear);
+  };
+
+  const fetchUserQuotas = async (userId: number, year: number) => {
+    try {
+      const res = await api.get(`/admin/users/leave-quotas?user_id=${userId}&year=${year}`);
+      const data = res.data;
+      if (data && data.quotas) {
+        const qMap: { [key: string]: number } = {};
+        data.quotas.forEach((item: any) => {
+          qMap[item.leave_type] = item.total_days;
+        });
+        setUserQuotas(qMap);
+        setUsedDaysMap(data.used_days_map || {});
+      }
+    } catch (err) {
+      console.error('Error fetching user leave quotas', err);
+    }
+  };
+
+  const handleYearChange = async (newYear: number) => {
+    setQuotaYear(newYear);
+    if (quotaUser) {
+      await fetchUserQuotas(quotaUser.ID, newYear);
+    }
+  };
+
+  const saveUserQuotas = async () => {
+    if (!quotaUser) return;
+    setSavingQuota(true);
+    try {
+      const quotasArray = Object.entries(userQuotas).map(([type, days]) => ({
+        leave_type: type,
+        total_days: Number(days) || 0
+      }));
+
+      await api.put('/admin/users/leave-quotas/update', {
+        user_id: quotaUser.ID,
+        year: quotaYear,
+        quotas: quotasArray
+      });
+
+      alert('บันทึกโควตาวันลาสำเร็จ');
+      setIsQuotaModalOpen(false);
+    } catch (err) {
+      alert('เกิดข้อผิดพลาดในการบันทึกโควตาวันลา');
+    } finally {
+      setSavingQuota(false);
+    }
+  };
+
   const daysOfWeek = [
     { id: 1, name: 'จันทร์' },
     { id: 2, name: 'อังคาร' },
@@ -127,7 +193,7 @@ export default function Users() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
         <div>
           <h2 className="text-2xl font-bold text-gray-800">จัดการพนักงาน</h2>
-          <p className="text-gray-500">จัดการสิทธิ์ (Role) และวันทำงานของพนักงาน</p>
+          <p className="text-gray-500">จัดการสิทธิ์ (Role), วันทำงาน และโควตาวันลาของพนักงาน</p>
         </div>
         <div className="flex bg-gray-100 p-1 rounded-lg">
           <button onClick={() => setRoleFilter('staff')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${roleFilter === 'staff' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>พนักงาน (Staff)</button>
@@ -140,9 +206,9 @@ export default function Users() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         {/* Desktop Header */}
         <div className="hidden md:grid grid-cols-12 gap-4 p-4 bg-gray-50 border-b border-gray-100">
-          <div className="col-span-5 font-semibold text-gray-600 text-sm">ผู้ใช้งาน</div>
-          <div className="col-span-3 font-semibold text-gray-600 text-sm">สิทธิ์ (Role)</div>
-          <div className="col-span-4 font-semibold text-gray-600 text-sm text-right">จัดการ</div>
+          <div className="col-span-4 font-semibold text-gray-600 text-sm">ผู้ใช้งาน</div>
+          <div className="col-span-2 font-semibold text-gray-600 text-sm">สิทธิ์ (Role)</div>
+          <div className="col-span-6 font-semibold text-gray-600 text-sm text-right">จัดการ</div>
         </div>
 
         {/* User List */}
@@ -161,7 +227,7 @@ export default function Users() {
             return (
               <div key={user.ID} className="flex flex-col md:grid md:grid-cols-12 gap-4 p-4 hover:bg-gray-50 transition-colors md:items-center">
                 {/* User Info */}
-                <div className="col-span-5 flex items-center space-x-3">
+                <div className="col-span-4 flex items-center space-x-3">
                   {user.PictureURL ? (
                     <img src={user.PictureURL} alt="" className="w-10 h-10 rounded-full" />
                   ) : (
@@ -176,7 +242,7 @@ export default function Users() {
                 </div>
 
                 {/* Roles */}
-                <div className="col-span-3 flex flex-wrap gap-1.5 mt-2 md:mt-0">
+                <div className="col-span-2 flex flex-wrap gap-1.5 mt-2 md:mt-0">
                   {userRoles.map((roleName, idx) => (
                     <span key={idx} className={`px-3 py-1 text-[10px] font-bold rounded-full ${
                       roleName === 'admin' ? 'bg-purple-100 text-purple-700' :
@@ -189,16 +255,22 @@ export default function Users() {
                 </div>
 
                 {/* Actions */}
-                <div className="col-span-4 flex flex-wrap gap-2 mt-3 md:mt-0 md:justify-end">
+                <div className="col-span-6 flex flex-wrap gap-2 mt-3 md:mt-0 md:justify-end">
+                  <button 
+                    onClick={() => openQuotaModal(user)}
+                    className="text-amber-700 hover:text-amber-900 text-sm font-medium bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center flex-1 md:flex-none justify-center"
+                  >
+                    <Briefcase size={16} className="mr-1" /> โควตาวันลา
+                  </button>
                   <button 
                     onClick={() => openScheduleModal(user)}
-                    className="text-indigo-600 hover:text-indigo-800 text-sm font-medium bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center flex-1 md:flex-none justify-center"
+                    className="text-indigo-600 hover:text-indigo-800 text-sm font-medium bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center flex-1 md:flex-none justify-center"
                   >
                     <Calendar size={16} className="mr-1" /> วันทำงาน
                   </button>
                   <button 
                     onClick={() => changeRole(user.ID, userRoles[0])}
-                    className="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-1.5 rounded-lg transition-colors flex-1 md:flex-none justify-center"
+                    className="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors flex-1 md:flex-none justify-center"
                   >
                     สลับสิทธิ์
                   </button>
@@ -266,6 +338,77 @@ export default function Users() {
           </div>
         </div>
       )}
+
+      {/* Leave Quotas Modal */}
+      {isQuotaModalOpen && quotaUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-bold text-gray-800">โควตาวันลาพนักงาน</h3>
+                <p className="text-sm text-gray-500 mt-0.5">{quotaUser.DisplayName || quotaUser.Name}</p>
+              </div>
+              <div>
+                <select 
+                  value={quotaYear}
+                  onChange={(e) => handleYearChange(Number(e.target.value))}
+                  className="text-sm font-bold border border-gray-300 rounded-lg p-1.5 bg-gray-50 text-gray-700 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value={2025}>ปี 2025</option>
+                  <option value={2026}>ปี 2026</option>
+                  <option value={2027}>ปี 2027</option>
+                </select>
+              </div>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              {['ลาป่วย', 'ลากิจ', 'ลาพักร้อน'].map((type) => {
+                const used = usedDaysMap[type] || 0;
+                const total = userQuotas[type] !== undefined ? userQuotas[type] : 0;
+                const remaining = total - used;
+
+                return (
+                  <div key={type} className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="font-bold text-gray-800 text-sm">{type}</span>
+                      <span className="text-xs text-gray-500">
+                        ใช้ไปแล้ว: <strong className="text-gray-700">{used}</strong> วัน (เหลือ <strong className={remaining > 0 ? 'text-green-600' : 'text-red-500'}>{remaining}</strong> วัน)
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input 
+                        type="number"
+                        min="0"
+                        value={userQuotas[type] !== undefined ? userQuotas[type] : ''}
+                        onChange={(e) => setUserQuotas({ ...userQuotas, [type]: Number(e.target.value) })}
+                        className="w-full text-base font-bold border border-gray-300 rounded-lg p-2.5 bg-white focus:ring-blue-500 focus:border-blue-500"
+                      />
+                      <span className="text-sm text-gray-500 whitespace-nowrap">วัน/ปี</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            
+            <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end space-x-3">
+              <button 
+                onClick={() => setIsQuotaModalOpen(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                ยกเลิก
+              </button>
+              <button 
+                onClick={saveUserQuotas}
+                disabled={savingQuota}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {savingQuota ? 'กำลังบันทึก...' : 'บันทึกโควตา'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

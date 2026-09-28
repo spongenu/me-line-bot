@@ -8,6 +8,8 @@ import Attendances from './pages/Attendances';
 import Leaves from './pages/Leaves';
 import EmployeeLeave from './pages/EmployeeLeave';
 
+import Settings from './pages/Settings';
+
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
   
@@ -44,6 +46,7 @@ function App() {
                 <Route path="users" element={<Users />} />
                 <Route path="attendances" element={<Attendances />} />
                 <Route path="leaves" element={<Leaves />} />
+                <Route path="settings" element={<Settings />} />
               </Route>
               <Route path="*" element={<div className="p-10 text-center font-bold text-red-600">404 Not Found<br/>Path: {window.location.pathname}<br/>Search: {window.location.search}</div>} />
             </Routes>

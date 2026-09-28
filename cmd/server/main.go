@@ -63,8 +63,11 @@ func main() {
 	requireAdmin := middleware.RequireAdmin(cfg.JWTSecret)
 	requireAuth := middleware.RequireAuth(cfg.JWTSecret)
 	mux.Handle("/api/user/leave-requests", requireAuth(http.HandlerFunc(userHandler.CreateLeaveRequestHandler)))
+	mux.Handle("/api/user/leave-balances", requireAuth(http.HandlerFunc(userHandler.GetUserLeaveBalancesHandler)))
 	mux.Handle("/api/admin/users", requireAdmin(http.HandlerFunc(adminHandler.GetUsersHandler)))
 	mux.Handle("/api/admin/users/role", requireAdmin(http.HandlerFunc(adminHandler.UpdateUserRoleHandler)))
+	mux.Handle("/api/admin/users/leave-quotas", requireAdmin(http.HandlerFunc(adminHandler.GetUserLeaveQuotasHandler)))
+	mux.Handle("/api/admin/users/leave-quotas/update", requireAdmin(http.HandlerFunc(adminHandler.UpdateUserLeaveQuotasHandler)))
 	mux.Handle("/api/admin/attendances", requireAdmin(http.HandlerFunc(adminHandler.GetAttendancesHandler)))
 	mux.Handle("/api/admin/attendances/update", requireAdmin(http.HandlerFunc(adminHandler.UpdateAttendanceHandler)))
 	mux.Handle("/api/admin/leave-requests", requireAdmin(http.HandlerFunc(adminHandler.GetLeaveRequestsHandler)))
@@ -73,6 +76,9 @@ func main() {
 	mux.Handle("/api/admin/schedules/update", requireAdmin(http.HandlerFunc(adminHandler.UpdateUserScheduleHandler)))
 	mux.Handle("/api/admin/system", requireAdmin(http.HandlerFunc(adminHandler.GetSystemSettingsHandler)))
 	mux.Handle("/api/admin/system/toggle", requireAdmin(http.HandlerFunc(adminHandler.ToggleSystemHandler)))
+	mux.Handle("/api/admin/settings/leave-quotas", requireAdmin(http.HandlerFunc(adminHandler.GetDefaultLeaveQuotasHandler)))
+	mux.Handle("/api/admin/settings/leave-quotas/update", requireAdmin(http.HandlerFunc(adminHandler.UpdateDefaultLeaveQuotasHandler)))
+	mux.Handle("/api/admin/settings/leave-quotas/sync", requireAdmin(http.HandlerFunc(adminHandler.SyncAnnualLeaveQuotasHandler)))
 
 	// Apply CORS
 	handlerWithCORS := middleware.CORS(mux)

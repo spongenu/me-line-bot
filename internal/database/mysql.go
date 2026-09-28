@@ -44,8 +44,9 @@ func Connect(cfg *config.Config) *gorm.DB {
 		log.Fatal("Failed to migrate database:", err)
 	}
 
-	// Seed default roles
+	// Seed default roles and settings
 	seedRoles(db)
+	seedSettings(db)
 
 	log.Println("Database migrated")
 	return db
@@ -63,3 +64,22 @@ func seedRoles(db *gorm.DB) {
 	}
 	log.Println("Roles seeded: customer, staff, admin")
 }
+
+// seedSettings สร้างค่าเริ่มต้นของระบบถ้ายังไม่มี
+func seedSettings(db *gorm.DB) {
+	defaults := []model.SystemSetting{
+		{KeyName: "default_quota_ลาป่วย", Value: "30"},
+		{KeyName: "default_quota_ลากิจ", Value: "3"},
+		{KeyName: "default_quota_ลาพักร้อน", Value: "6"},
+	}
+	for _, s := range defaults {
+		var existing model.SystemSetting
+		if err := db.Where("key_name = ?", s.KeyName).First(&existing).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				db.Create(&s)
+			}
+		}
+	}
+	log.Println("Default leave settings seeded")
+}
+

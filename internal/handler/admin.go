@@ -386,3 +386,251 @@ func (h *AdminHandler) ToggleSystemHandler(w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]bool{"system_open": reqBody.SystemOpen})
 }
+
+// ==================== LEAVE QUOTAS ====================
+
+type LeaveQuotaConfigItem struct {
+	LeaveType string `json:"leave_type"`
+	TotalDays int    `json:"total_days"`
+}
+
+type UserLeaveQuotaResponse struct {
+	UserID      uint                   `json:"user_id"`
+	Year        int                    `json:"year"`
+	Quotas      []LeaveQuotaConfigItem `json:"quotas"`
+	UsedDaysMap map[string]int         `json:"used_days_map"`
+}
+
+func (h *AdminHandler) GetDefaultLeaveQuotasHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	leaveTypes := []string{"ลาป่วย", "ลากิจ", "ลาพักร้อน"}
+	defaults := make([]LeaveQuotaConfigItem, 0, len(leaveTypes))
+
+	for _, lt := range leaveTypes {
+		var setting model.SystemSetting
+		keyName := "default_quota_" + lt
+		val := 0
+		if err := h.DB.Where("key_name = ?", keyName).First(&setting).Error; err == nil {
+			val, _ = strconv.Atoi(setting.Value)
+		} else {
+			if lt == "ลาป่วย" {
+				val = 30
+			} else if lt == "ลากิจ" {
+				val = 3
+			} else if lt == "ลาพักร้อน" {
+				val = 6
+			}
+		}
+		defaults = append(defaults, LeaveQuotaConfigItem{
+			LeaveType: lt,
+			TotalDays: val,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(defaults)
+}
+
+func (h *AdminHandler) UpdateDefaultLeaveQuotasHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var reqBody []LeaveQuotaConfigItem
+	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	for _, item := range reqBody {
+		if item.LeaveType == "" {
+			continue
+		}
+		keyName := "default_quota_" + item.LeaveType
+		var setting model.SystemSetting
+		h.DB.Where(model.SystemSetting{KeyName: keyName}).FirstOrCreate(&setting, model.SystemSetting{
+			KeyName: keyName,
+			Value:   strconv.Itoa(item.TotalDays),
+		})
+		setting.Value = strconv.Itoa(item.TotalDays)
+		h.DB.Save(&setting)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Default leave quotas updated successfully"})
+}
+
+func (h *AdminHandler) SyncAnnualLeaveQuotasHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var reqBody struct {
+		Year              int  `json:"year"`
+		OverwriteExisting bool `json:"overwrite_existing"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	if reqBody.Year == 0 {
+		reqBody.Year = time.Now().Year()
+	}
+
+	// Get default quotas
+	leaveTypes := []string{"ลาป่วย", "ลากิจ", "ลาพักร้อน"}
+	defaultMap := make(map[string]int)
+	for _, lt := range leaveTypes {
+		var setting model.SystemSetting
+		keyName := "default_quota_" + lt
+		val := 0
+		if err := h.DB.Where("key_name = ?", keyName).First(&setting).Error; err == nil {
+			val, _ = strconv.Atoi(setting.Value)
+		} else {
+			if lt == "ลาป่วย" {
+				val = 30
+			} else if lt == "ลากิจ" {
+				val = 3
+			} else if lt == "ลาพักร้อน" {
+				val = 6
+			}
+		}
+		defaultMap[lt] = val
+	}
+
+	// Find all staff users
+	var userRoles []model.UserRole
+	h.DB.Preload("Role").Where("role_id IN (SELECT id FROM roles WHERE name IN ('staff', 'admin'))").Find(&userRoles)
+
+	syncedCount := 0
+	for _, ur := range userRoles {
+		for lt, days := range defaultMap {
+			var existing model.LeaveQuota
+			err := h.DB.Where("user_id = ? AND leave_type = ? AND year = ?", ur.UserID, lt, reqBody.Year).First(&existing).Error
+			if err == nil {
+				if reqBody.OverwriteExisting {
+					existing.TotalDays = days
+					h.DB.Save(&existing)
+					syncedCount++
+				}
+			} else {
+				newQuota := model.LeaveQuota{
+					UserID:    ur.UserID,
+					LeaveType: lt,
+					Year:      reqBody.Year,
+					TotalDays: days,
+				}
+				h.DB.Create(&newQuota)
+				syncedCount++
+			}
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message":      "Synced annual quotas successfully",
+		"year":         reqBody.Year,
+		"synced_count": syncedCount,
+	})
+}
+
+func (h *AdminHandler) GetUserLeaveQuotasHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	userIDStr := r.URL.Query().Get("user_id")
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+
+	year := time.Now().Year()
+	if yearStr := r.URL.Query().Get("year"); yearStr != "" {
+		if parsedYear, err := strconv.Atoi(yearStr); err == nil {
+			year = parsedYear
+		}
+	}
+
+	leaveTypes := []string{"ลาป่วย", "ลากิจ", "ลาพักร้อน"}
+	quotas := make([]LeaveQuotaConfigItem, 0, len(leaveTypes))
+	usedDaysMap := make(map[string]int)
+
+	for _, lt := range leaveTypes {
+		total := GetUserLeaveQuota(h.DB, uint(userID), lt, year)
+		used, _ := GetUserUsedAndPendingLeaveDays(h.DB, uint(userID), lt, year)
+		quotas = append(quotas, LeaveQuotaConfigItem{
+			LeaveType: lt,
+			TotalDays: total,
+		})
+		usedDaysMap[lt] = used
+	}
+
+	resp := UserLeaveQuotaResponse{
+		UserID:      uint(userID),
+		Year:        year,
+		Quotas:      quotas,
+		UsedDaysMap: usedDaysMap,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+func (h *AdminHandler) UpdateUserLeaveQuotasHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var reqBody struct {
+		UserID uint                   `json:"user_id"`
+		Year   int                    `json:"year"`
+		Quotas []LeaveQuotaConfigItem `json:"quotas"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	if reqBody.UserID == 0 {
+		http.Error(w, "User ID is required", http.StatusBadRequest)
+		return
+	}
+	if reqBody.Year == 0 {
+		reqBody.Year = time.Now().Year()
+	}
+
+	for _, q := range reqBody.Quotas {
+		if q.LeaveType == "" {
+			continue
+		}
+		var quota model.LeaveQuota
+		err := h.DB.Where("user_id = ? AND leave_type = ? AND year = ?", reqBody.UserID, q.LeaveType, reqBody.Year).First(&quota).Error
+		if err == nil {
+			quota.TotalDays = q.TotalDays
+			h.DB.Save(&quota)
+		} else {
+			newQuota := model.LeaveQuota{
+				UserID:    reqBody.UserID,
+				LeaveType: q.LeaveType,
+				Year:      reqBody.Year,
+				TotalDays: q.TotalDays,
+			}
+			h.DB.Create(&newQuota)
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "User leave quotas updated successfully"})
+}
+

@@ -1,15 +1,16 @@
 import { Outlet, NavLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { LayoutDashboard, Users, Clock, CalendarDays, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, Clock, CalendarDays, Settings, LogOut } from 'lucide-react';
 
 export default function Layout() {
   const { logout, user } = useAuth();
   
   const navItems = [
     { to: '/dashboard', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
-    { to: '/users', icon: <Users size={20} />, label: 'พนักงาน (Users)' },
+    { to: '/users', icon: <Users size={20} />, label: 'พนักงาน' },
     { to: '/attendances', icon: <Clock size={20} />, label: 'เวลาเข้า-ออก' },
     { to: '/leaves', icon: <CalendarDays size={20} />, label: 'อนุมัติวันลา' },
+    { to: '/settings', icon: <Settings size={20} />, label: 'ตั้งค่าระบบ' },
   ];
 
   return (
