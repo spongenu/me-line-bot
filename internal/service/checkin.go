@@ -90,6 +90,11 @@ func (s *CheckinService) HandleText(event *linebot.Event, text string) {
 		delete(s.states, userId)
 		s.mu.Unlock()
 		s.replyText(event.ReplyToken, "↩️ ยกเลิกแล้วครับ")
+	case "ลา", "ลางาน", "ขอลา", "leave":
+		s.mu.Lock()
+		delete(s.states, userId)
+		s.mu.Unlock()
+		s.handleLeaveRequest(event)
 	case "สรุปวันนี้", "summary":
 		s.handleSummaryToday(event)
 	default:
@@ -277,4 +282,72 @@ func (s *CheckinService) replyMainMenu(replyToken string) {
 	s.bot.ReplyMessage(replyToken,
 		linebot.NewTextMessage("🏪 ME Bot\n\nพิมพ์คำสั่ง:\n• ลงทะเบียน\n• เช็คอิน\n• เช็คเอาท์\n• ยกเลิก"),
 	).Do()
+}
+
+func (s *CheckinService) handleLeaveRequest(event *linebot.Event) {
+	leaveUrl := s.cfg.LeaveLiffURL
+	if leaveUrl == "" || leaveUrl == "https://liff.line.me/YOUR-LIFF-ID" {
+		leaveUrl = "https://liff.line.me/YOUR-LIFF-ID" // Fallback placeholder
+	}
+
+	flexMsg := `{
+		"type": "bubble",
+		"size": "kilo",
+		"header": {
+			"type": "box",
+			"layout": "vertical",
+			"contents": [
+				{
+					"type": "text",
+					"text": "ยื่นใบลา",
+					"weight": "bold",
+					"color": "#ffffff",
+					"size": "lg"
+				}
+			],
+			"backgroundColor": "#ff8c00",
+			"paddingAll": "12px"
+		},
+		"body": {
+			"type": "box",
+			"layout": "vertical",
+			"contents": [
+				{
+					"type": "text",
+					"text": "คลิกที่ปุ่มด้านล่างเพื่อกรอกข้อมูลการลาผ่านระบบครับ",
+					"wrap": true,
+					"size": "sm",
+					"color": "#666666"
+				}
+			],
+			"paddingAll": "16px"
+		},
+		"footer": {
+			"type": "box",
+			"layout": "vertical",
+			"contents": [
+				{
+					"type": "button",
+					"action": {
+						"type": "uri",
+						"label": "📝 กรอกใบลา",
+						"uri": "` + leaveUrl + `"
+					},
+					"style": "primary",
+					"color": "#ff8c00"
+				}
+			],
+			"paddingAll": "12px"
+		}
+	}`
+
+	container, err := linebot.UnmarshalFlexMessageJSON([]byte(flexMsg))
+	if err != nil {
+		s.replyText(event.ReplyToken, "สามารถยื่นใบลาได้ที่ลิงก์นี้ครับ:\n"+leaveUrl)
+		return
+	}
+
+	if _, err := s.bot.ReplyMessage(event.ReplyToken, linebot.NewFlexMessage("ยื่นใบลา", container)).Do(); err != nil {
+		s.replyText(event.ReplyToken, "สามารถยื่นใบลาได้ที่ลิงก์นี้ครับ:\n"+leaveUrl)
+	}
 }

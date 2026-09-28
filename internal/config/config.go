@@ -18,6 +18,7 @@ type Config struct {
 	DBName            string
 	LineLoginClientID string
 	JWTSecret         string
+	LeaveLiffURL      string
 }
 
 func Load() *Config {
@@ -36,6 +37,7 @@ func Load() *Config {
 		DBName:            getEnv("DB_NAME", "mebot_db"),
 		LineLoginClientID: getEnv("LINE_LOGIN_CLIENT_ID", ""),
 		JWTSecret:         getEnv("JWT_SECRET", "super-secret-key-change-in-prod"),
+		LeaveLiffURL:      getEnv("LEAVE_LIFF_URL", "https://liff.line.me/YOUR-LIFF-ID"),
 	}
 }
 
