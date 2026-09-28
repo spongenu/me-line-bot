@@ -28,22 +28,29 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/leave" element={<EmployeeLeave />} />
-          <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-            <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="users" element={<Users />} />
-            <Route path="attendances" element={<Attendances />} />
-            <Route path="leaves" element={<Leaves />} />
-          </Route>
-          <Route path="*" element={<div className="p-10 text-center font-bold text-red-600">404 Not Found<br/>Path: {window.location.pathname}<br/>Search: {window.location.search}</div>} />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+    <BrowserRouter>
+      <Routes>
+        {/* Public Routes (No AuthContext) */}
+        <Route path="/leave" element={<EmployeeLeave />} />
+        
+        {/* Admin Routes (Wrapped in AuthProvider) */}
+        <Route path="/*" element={
+          <AuthProvider>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+                <Route index element={<Navigate to="/dashboard" replace />} />
+                <Route path="dashboard" element={<Dashboard />} />
+                <Route path="users" element={<Users />} />
+                <Route path="attendances" element={<Attendances />} />
+                <Route path="leaves" element={<Leaves />} />
+              </Route>
+              <Route path="*" element={<div className="p-10 text-center font-bold text-red-600">404 Not Found<br/>Path: {window.location.pathname}<br/>Search: {window.location.search}</div>} />
+            </Routes>
+          </AuthProvider>
+        } />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
