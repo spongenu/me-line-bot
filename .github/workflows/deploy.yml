@@ -52,5 +52,6 @@ jobs:
             echo "DB_ROOT_PASSWORD=${{ secrets.DB_ROOT_PASSWORD }}" >> .env
             echo "LINE_LOGIN_CLIENT_ID=2011746778" >> .env
             echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
+            echo "LEAVE_LIFF_URL=https://liff.line.me/2011746778-ZgnWSeO6" >> .env
             docker compose pull app
             docker compose up -d app
