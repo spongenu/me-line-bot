@@ -18,7 +18,7 @@ export default function EmployeeLeave() {
   useEffect(() => {
     const initLiff = async () => {
       try {
-        await liff.init({ liffId: import.meta.env.VITE_LIFF_LEAVE_ID || '2011746778-ZgnWSeO6' });
+        await liff.init({ liffId: import.meta.env.VITE_LIFF_LEAVE_ID });
         if (!liff.isLoggedIn()) {
           liff.login({ redirectUri: window.location.href });
           return;
