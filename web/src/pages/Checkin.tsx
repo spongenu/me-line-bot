@@ -150,10 +150,21 @@ export default function Checkin() {
       // Attempt to send a message via LIFF if available
       try {
         if (liff.isLoggedIn()) {
+          const now = new Date();
+          const thaiDate = now.toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
+          const thaiTime = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+          
+          let msgText = '';
+          if (action === 'checkin') {
+            msgText = `🟢 บันทึกเวลาเข้างาน\n🗓️ วันที่: ${thaiDate}\n⏰ เวลาเข้า: ${thaiTime} น.`;
+          } else {
+            msgText = `🔴 บันทึกเวลาออกงาน\n🗓️ วันที่: ${thaiDate}\n⏰ เวลาออก: ${thaiTime} น.\n⌛ สถานะ: ออกงานเรียบร้อย`;
+          }
+
           await liff.sendMessages([
             {
               type: 'text',
-              text: `ฉันได้ทำการ ${actionText} แล้ว (${currentTime} น.)`,
+              text: msgText,
             },
           ]);
         }

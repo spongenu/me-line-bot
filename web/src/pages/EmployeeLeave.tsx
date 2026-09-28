@@ -110,7 +110,13 @@ export default function EmployeeLeave() {
         reason: reason.trim()
       });
       
-      const msgText = `ฉันได้ยื่นคำขอ${leaveType} (${startDate} ถึง ${endDate}) จำนวน ${requestedDays} วัน เข้าระบบแล้ว`;
+      // Format dates nicely
+      const sDate = new Date(startDate).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
+      const eDate = startDate === endDate ? sDate : new Date(endDate).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
+      const dateDisplay = startDate === endDate ? sDate : `${sDate} - ${eDate}`;
+      const emoji = leaveType === 'ลาป่วย' ? '🤒' : (leaveType === 'ลาพักร้อน' ? '🏖️' : '📝');
+
+      const msgText = `📝 ยื่นคำขออนุมัติการลา\n🔖 ประเภท: ${leaveType} ${emoji}\n🗓️ วันที่: ${dateDisplay} (${requestedDays} วัน)\n💬 เหตุผล: ${reason.trim() || '-'}\n*(รอผู้ดูแลระบบอนุมัติ)*`;
       
       await liff.sendMessages([
         {
