@@ -75,26 +75,17 @@ func (s *CheckinService) HandleText(event *linebot.Event, text string) {
 	switch text {
 	case "ลงทะเบียน", "register", "Register":
 		s.handleRegisterStart(event)
-	case "เช็คอิน", "check-in", "Check-in", "checkin":
-		s.mu.Lock()
-		delete(s.states, userId)
-		s.mu.Unlock()
-		s.handleCheckinRequest(event)
-	case "เช็คเอาท์", "check-out", "Check-out", "checkout":
-		s.mu.Lock()
-		delete(s.states, userId)
-		s.mu.Unlock()
-		s.handleCheckoutRequest(event)
+	case "เช็คอิน", "check-in", "Check-in", "checkin", "เช็คเอาท์", "check-out", "Check-out", "checkout":
+		s.handleAttendanceRequest(event)
 	case "ยกเลิก", "cancel":
 		s.mu.Lock()
 		delete(s.states, userId)
 		s.mu.Unlock()
 		s.replyText(event.ReplyToken, "↩️ ยกเลิกแล้วครับ")
 	case "ลา", "ลางาน", "ขอลา", "leave":
-		s.mu.Lock()
-		delete(s.states, userId)
-		s.mu.Unlock()
 		s.handleLeaveRequest(event)
+	case "ประวัติ", "ประวัติการทำงาน", "history", "History":
+		s.handleHistoryRequest(event)
 	case "สรุปวันนี้", "summary":
 		s.handleSummaryToday(event)
 	default:
@@ -109,188 +100,86 @@ func (s *CheckinService) HandleText(event *linebot.Event, text string) {
 }
 
 func (s *CheckinService) HandleLocation(event *linebot.Event, lat, lng float64) {
-	userId := event.Source.UserID
+	s.handleAttendanceRequest(event)
+}
 
-	s.mu.Lock()
-	state := s.states[userId]
-	s.mu.Unlock()
-
-	if state == nil ||
-		(state.Step != "awaiting_checkin_location" &&
-			state.Step != "awaiting_checkout_location") {
-		s.replyText(event.ReplyToken, "❌ กรุณาพิมพ์ 'เช็คอิน' หรือ 'เช็คเอาท์' ก่อนแชร์ตำแหน่งครับ")
-		return
+func (s *CheckinService) handleAttendanceRequest(event *linebot.Event) {
+	liffUrl := s.cfg.StaffLiffURL
+	if liffUrl == "" || liffUrl == "https://liff.line.me/YOUR-LIFF-ID" {
+		liffUrl = "https://liff.line.me/YOUR-LIFF-ID"
 	}
+	checkinUrl := fmt.Sprintf("%s?path=checkin", liffUrl)
 
-	isCheckIn := state.Step == "awaiting_checkin_location"
+	flexMsg := fmt.Sprintf(`{
+		"type": "bubble",
+		"size": "kilo",
+		"header": {
+			"type": "box",
+			"layout": "vertical",
+			"contents": [
+				{
+					"type": "text",
+					"text": "ลงเวลาทำงาน",
+					"weight": "bold",
+					"color": "#ffffff",
+					"size": "lg"
+				}
+			],
+			"backgroundColor": "#2563eb",
+			"paddingAll": "12px"
+		},
+		"body": {
+			"type": "box",
+			"layout": "vertical",
+			"contents": [
+				{
+					"type": "text",
+					"text": "กดปุ่มด้านล่างเพื่อบันทึกเวลาเข้า-ออกงานผ่านระบบ GPS ครับ",
+					"wrap": true,
+					"size": "sm",
+					"color": "#666666"
+				}
+			],
+			"paddingAll": "16px"
+		},
+		"footer": {
+			"type": "box",
+			"layout": "vertical",
+			"contents": [
+				{
+					"type": "button",
+					"action": {
+						"type": "uri",
+						"label": "⏱️ บันทึกเวลาเข้า-ออกงาน",
+						"uri": "%s"
+					},
+					"style": "primary",
+					"color": "#2563eb"
+				}
+			],
+			"paddingAll": "12px"
+		}
+	}`, checkinUrl)
 
-	s.mu.Lock()
-	delete(s.states, userId)
-	s.mu.Unlock()
-
-	now := time.Now().In(bangkokTZ())
-	today := now.Format("2006-01-02")
-	timeStr := now.Format("15:04")
-
-	user, err := s.userRepo.FindByLineID(userId)
-	if err != nil || !user.IsActive {
-		s.replyText(event.ReplyToken, "❌ ยังไม่ได้รับการอนุมัติจาก admin")
-		return
-	}
-
-	shop, err := s.userRepo.GetStaffShop(user.ID)
+	container, err := linebot.UnmarshalFlexMessageJSON([]byte(flexMsg))
 	if err != nil {
-		s.replyText(event.ReplyToken, "❌ ไม่พบข้อมูลร้าน กรุณาติดต่อ admin")
+		s.replyText(event.ReplyToken, "สามารถลงเวลาทำงานได้ที่ลิงก์นี้ครับ:\n"+checkinUrl)
 		return
 	}
 
-	dist := Haversine(lat, lng, shop.Lat, shop.Lng)
-	if dist > float64(shop.RadiusM) {
-		s.replyText(event.ReplyToken,
-			fmt.Sprintf("❌ ตำแหน่งของคุณอยู่ห่างจากร้าน %.0f เมตร\n(อนุญาตสูงสุด %d เมตร)", dist, shop.RadiusM))
-		return
+	if _, err := s.bot.ReplyMessage(event.ReplyToken, linebot.NewFlexMessage("ลงเวลาทำงาน", container)).Do(); err != nil {
+		s.replyText(event.ReplyToken, "สามารถลงเวลาทำงานได้ที่ลิงก์นี้ครับ:\n"+checkinUrl)
 	}
-
-	if isCheckIn {
-		att, _ := s.attRepo.FindTodayByUser(user.ID, today)
-		if att != nil {
-			s.replyText(event.ReplyToken, "ℹ️ คุณได้เช็คอินแล้ววันนี้")
-			return
-		}
-		if err := s.attRepo.CreateCheckIn(user.ID, shop.ID, lat, lng, now); err != nil {
-			log.Println("CreateCheckIn error:", err)
-			s.replyText(event.ReplyToken, "❌ เกิดข้อผิดพลาด กรุณาลองใหม่")
-			return
-		}
-		s.replyText(event.ReplyToken, fmt.Sprintf("✅ เช็คอินสำเร็จ!\n🕐 เวลา: %s น.", timeStr))
-		if s.userRepo.IsSystemOpen() {
-			s.pushToGroup(shop.LineGroupID,
-				fmt.Sprintf("✅ เช็คอิน\n👤 %s\n🕐 เวลา: %s น.\n🏪 %s", user.DisplayName, timeStr, shop.Name))
-		}
-	} else {
-		att, err := s.attRepo.FindLatestOpenByUser(user.ID)
-		if err != nil || att == nil {
-			s.replyText(event.ReplyToken, "❌ ไม่พบรายการเช็คอินที่รอเช็คเอาท์")
-			return
-		}
-		if att.CheckInTime != nil && now.Sub(*att.CheckInTime) > MaxShiftDuration {
-			hours := int(now.Sub(*att.CheckInTime).Hours())
-			s.replyText(event.ReplyToken,
-				fmt.Sprintf("❌ ไม่สามารถเช็คเอาท์ได้เนื่องจากเกินเวลาที่กำหนด (ผ่านมา %d ชม. เกินเกณฑ์ 18 ชม.)\nกรุณากด 'เช็คอิน' สำหรับวันใหม่ และติดต่อ admin เพื่อแก้ไขเวลาย้อนหลังครับ", hours))
-			return
-		}
-		durationMin := int(now.Sub(*att.CheckInTime).Minutes())
-		hours := durationMin / 60
-		mins := durationMin % 60
-		checkInStr := att.CheckInTime.In(bangkokTZ()).Format("15:04")
-
-		if err := s.attRepo.UpdateCheckOut(att.ID, lat, lng, now, durationMin); err != nil {
-			log.Println("UpdateCheckOut error:", err)
-			s.replyText(event.ReplyToken, "❌ เกิดข้อผิดพลาด กรุณาลองใหม่")
-			return
-		}
-		checkInDate := att.CheckInTime.In(bangkokTZ()).Format("2006-01-02")
-		checkOutDate := now.Format("2006-01-02")
-		nextDayMark := ""
-		if checkOutDate != checkInDate {
-			nextDayMark = " (+1)"
-		}
-		s.replyText(event.ReplyToken,
-			fmt.Sprintf("✅ เช็คเอาท์สำเร็จ!\n🕔 เวลาออก: %s%s\n⏱ ทำงานรวม: %d ชม. %d นาที",
-				timeStr, nextDayMark, hours, mins))
-		if s.userRepo.IsSystemOpen() {
-			s.pushToGroup(shop.LineGroupID,
-				fmt.Sprintf("🔴 เช็คเอาท์\n👤 %s\n🕗 เข้างาน: %s น.\n🕔 ออกงาน: %s%s\n⏱ รวม: %d ชม. %d นาที\n🏪 %s",
-					user.DisplayName, checkInStr, timeStr, nextDayMark, hours, mins, shop.Name))
-		}
-	}
-}
-
-func (s *CheckinService) handleCheckinRequest(event *linebot.Event) {
-	userId := event.Source.UserID
-	user, err := s.userRepo.FindByLineID(userId)
-	if err != nil || !user.IsActive {
-		s.replyText(event.ReplyToken, "❌ ยังไม่ได้รับการอนุมัติจาก admin")
-		return
-	}
-	if !s.userRepo.HasRole(user.ID, "staff") {
-		s.replyText(event.ReplyToken, "❌ คุณไม่มีสิทธิ์เช็คอิน กรุณาติดต่อ admin")
-		return
-	}
-
-
-
-	today := time.Now().In(bangkokTZ()).Format("2006-01-02")
-	att, _ := s.attRepo.FindTodayByUser(user.ID, today)
-	if att != nil {
-		s.replyText(event.ReplyToken, "ℹ️ คุณได้เช็คอินแล้ววันนี้")
-		return
-	}
-
-	s.mu.Lock()
-	s.states[userId] = &userState{Step: "awaiting_checkin_location"}
-	s.mu.Unlock()
-
-	s.replyText(event.ReplyToken, "📍 กด + แล้วเลือก 'ตำแหน่ง' เพื่อแชร์พิกัดสำหรับเช็คอินครับ")
-}
-
-func (s *CheckinService) handleCheckoutRequest(event *linebot.Event) {
-	userId := event.Source.UserID
-	user, err := s.userRepo.FindByLineID(userId)
-	if err != nil || !user.IsActive {
-		s.replyText(event.ReplyToken, "❌ ยังไม่ได้รับการอนุมัติจาก admin")
-		return
-	}
-	if !s.userRepo.HasRole(user.ID, "staff") {
-		s.replyText(event.ReplyToken, "❌ คุณไม่มีสิทธิ์เช็คเอาท์ กรุณาติดต่อ admin")
-		return
-	}
-
-	att, err := s.attRepo.FindLatestOpenByUser(user.ID)
-	if err != nil || att == nil {
-		s.replyText(event.ReplyToken, "❌ ไม่พบรายการเช็คอินที่รอเช็คเอาท์")
-		return
-	}
-	now := time.Now().In(bangkokTZ())
-	if att.CheckInTime != nil && now.Sub(*att.CheckInTime) > MaxShiftDuration {
-		hours := int(now.Sub(*att.CheckInTime).Hours())
-		s.replyText(event.ReplyToken,
-			fmt.Sprintf("❌ ไม่สามารถเช็คเอาท์ได้เนื่องจากเกินเวลาที่กำหนด (ผ่านมา %d ชม. เกินเกณฑ์ 18 ชม.)\nกรุณากด 'เช็คอิน' สำหรับวันใหม่ และติดต่อ admin เพื่อปรับเวลาของกะก่อนหน้าครับ", hours))
-		return
-	}
-
-	s.mu.Lock()
-	s.states[userId] = &userState{Step: "awaiting_checkout_location"}
-	s.mu.Unlock()
-
-	s.replyText(event.ReplyToken, "📍 กด + แล้วเลือก 'ตำแหน่ง' เพื่อแชร์พิกัดสำหรับเช็คเอาท์ครับ")
-}
-
-func (s *CheckinService) replyText(replyToken, text string) {
-	if _, err := s.bot.ReplyMessage(replyToken, linebot.NewTextMessage(text)).Do(); err != nil {
-		log.Println("replyText error:", err)
-	}
-}
-
-func (s *CheckinService) pushToGroup(groupID, text string) {
-	if _, err := s.bot.PushMessage(groupID, linebot.NewTextMessage(text)).Do(); err != nil {
-		log.Println("pushToGroup error:", err)
-	}
-}
-
-func (s *CheckinService) replyMainMenu(replyToken string) {
-	s.bot.ReplyMessage(replyToken,
-		linebot.NewTextMessage("🏪 ME Bot\n\nพิมพ์คำสั่ง:\n• ลงทะเบียน\n• เช็คอิน\n• เช็คเอาท์\n• ยกเลิก"),
-	).Do()
 }
 
 func (s *CheckinService) handleLeaveRequest(event *linebot.Event) {
-	leaveUrl := s.cfg.LeaveLiffURL
-	if leaveUrl == "" || leaveUrl == "https://liff.line.me/YOUR-LIFF-ID" {
-		leaveUrl = "https://liff.line.me/YOUR-LIFF-ID" // Fallback placeholder
+	liffUrl := s.cfg.StaffLiffURL
+	if liffUrl == "" || liffUrl == "https://liff.line.me/YOUR-LIFF-ID" {
+		liffUrl = "https://liff.line.me/YOUR-LIFF-ID"
 	}
+	leaveUrl := fmt.Sprintf("%s?path=leave", liffUrl)
 
-	flexMsg := `{
+	flexMsg := fmt.Sprintf(`{
 		"type": "bubble",
 		"size": "kilo",
 		"header": {
@@ -305,7 +194,7 @@ func (s *CheckinService) handleLeaveRequest(event *linebot.Event) {
 					"size": "lg"
 				}
 			],
-			"backgroundColor": "#ff8c00",
+			"backgroundColor": "#d97706",
 			"paddingAll": "12px"
 		},
 		"body": {
@@ -314,7 +203,7 @@ func (s *CheckinService) handleLeaveRequest(event *linebot.Event) {
 			"contents": [
 				{
 					"type": "text",
-					"text": "คลิกที่ปุ่มด้านล่างเพื่อกรอกข้อมูลการลาผ่านระบบครับ",
+					"text": "คลิกที่ปุ่มด้านล่างเพื่อตรวจสอบโควตาและยื่นใบลาครับ",
 					"wrap": true,
 					"size": "sm",
 					"color": "#666666"
@@ -331,15 +220,15 @@ func (s *CheckinService) handleLeaveRequest(event *linebot.Event) {
 					"action": {
 						"type": "uri",
 						"label": "📝 กรอกใบลา",
-						"uri": "` + leaveUrl + `"
+						"uri": "%s"
 					},
 					"style": "primary",
-					"color": "#ff8c00"
+					"color": "#d97706"
 				}
 			],
 			"paddingAll": "12px"
 		}
-	}`
+	}`, leaveUrl)
 
 	container, err := linebot.UnmarshalFlexMessageJSON([]byte(flexMsg))
 	if err != nil {
@@ -350,4 +239,94 @@ func (s *CheckinService) handleLeaveRequest(event *linebot.Event) {
 	if _, err := s.bot.ReplyMessage(event.ReplyToken, linebot.NewFlexMessage("ยื่นใบลา", container)).Do(); err != nil {
 		s.replyText(event.ReplyToken, "สามารถยื่นใบลาได้ที่ลิงก์นี้ครับ:\n"+leaveUrl)
 	}
+}
+
+func (s *CheckinService) handleHistoryRequest(event *linebot.Event) {
+	liffUrl := s.cfg.StaffLiffURL
+	if liffUrl == "" || liffUrl == "https://liff.line.me/YOUR-LIFF-ID" {
+		liffUrl = "https://liff.line.me/YOUR-LIFF-ID"
+	}
+	historyUrl := fmt.Sprintf("%s?path=history", liffUrl)
+
+	flexMsg := fmt.Sprintf(`{
+		"type": "bubble",
+		"size": "kilo",
+		"header": {
+			"type": "box",
+			"layout": "vertical",
+			"contents": [
+				{
+					"type": "text",
+					"text": "ประวัติการทำงาน",
+					"weight": "bold",
+					"color": "#ffffff",
+					"size": "lg"
+				}
+			],
+			"backgroundColor": "#059669",
+			"paddingAll": "12px"
+		},
+		"body": {
+			"type": "box",
+			"layout": "vertical",
+			"contents": [
+				{
+					"type": "text",
+					"text": "คลิกที่ปุ่มด้านล่างเพื่อดูประวัติเวลาเข้า-ออกงานและสรุปชั่วโมงครับ",
+					"wrap": true,
+					"size": "sm",
+					"color": "#666666"
+				}
+			],
+			"paddingAll": "16px"
+		},
+		"footer": {
+			"type": "box",
+			"layout": "vertical",
+			"contents": [
+				{
+					"type": "button",
+					"action": {
+						"type": "uri",
+						"label": "📊 ดูประวัติการทำงาน",
+						"uri": "%s"
+					},
+					"style": "primary",
+					"color": "#059669"
+				}
+			],
+			"paddingAll": "12px"
+		}
+	}`, historyUrl)
+
+	container, err := linebot.UnmarshalFlexMessageJSON([]byte(flexMsg))
+	if err != nil {
+		s.replyText(event.ReplyToken, "สามารถดูประวัติการทำงานได้ที่ลิงก์นี้ครับ:\n"+historyUrl)
+		return
+	}
+
+	if _, err := s.bot.ReplyMessage(event.ReplyToken, linebot.NewFlexMessage("ประวัติการทำงาน", container)).Do(); err != nil {
+		s.replyText(event.ReplyToken, "สามารถดูประวัติการทำงานได้ที่ลิงก์นี้ครับ:\n"+historyUrl)
+	}
+}
+
+func (s *CheckinService) replyText(replyToken, text string) {
+	if _, err := s.bot.ReplyMessage(replyToken, linebot.NewTextMessage(text)).Do(); err != nil {
+		log.Println("replyText error:", err)
+	}
+}
+
+func (s *CheckinService) pushToGroup(groupID, text string) {
+	if !s.userRepo.IsGroupNotifyEnabled() {
+		return
+	}
+	if _, err := s.bot.PushMessage(groupID, linebot.NewTextMessage(text)).Do(); err != nil {
+		log.Println("pushToGroup error:", err)
+	}
+}
+
+func (s *CheckinService) replyMainMenu(replyToken string) {
+	s.bot.ReplyMessage(replyToken,
+		linebot.NewTextMessage("🏪 ME Bot\n\nพิมพ์คำสั่ง:\n• ลงทะเบียน\n• เช็คอิน\n• เช็คเอาท์\n• ลางาน\n• ประวัติ\n• ยกเลิก"),
+	).Do()
 }

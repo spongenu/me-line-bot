@@ -19,14 +19,16 @@ const (
 )
 
 type RichMenuService struct {
-	accessToken string
-	MenuIDs     map[string]string
+	accessToken  string
+	staffLiffURL string
+	MenuIDs      map[string]string
 }
 
-func NewRichMenuService(accessToken string) *RichMenuService {
+func NewRichMenuService(accessToken, staffLiffURL string) *RichMenuService {
 	return &RichMenuService{
-		accessToken: accessToken,
-		MenuIDs:     make(map[string]string),
+		accessToken:  accessToken,
+		staffLiffURL: staffLiffURL,
+		MenuIDs:      make(map[string]string),
 	}
 }
 
@@ -163,6 +165,10 @@ func (s *RichMenuService) buildMenuA() map[string]interface{} {
 }
 
 func (s *RichMenuService) buildMenuB() map[string]interface{} {
+	liffBase := s.staffLiffURL
+	if liffBase == "" {
+		liffBase = "https://liff.line.me/YOUR-LIFF-ID"
+	}
 	return map[string]interface{}{
 		"size":        map[string]int{"width": 2500, "height": 843},
 		"selected":    true,
@@ -170,12 +176,28 @@ func (s *RichMenuService) buildMenuB() map[string]interface{} {
 		"chatBarText": "Menu",
 		"areas": []map[string]interface{}{
 			{
-				"bounds": map[string]int{"x": 0, "y": 0, "width": 1250, "height": 843},
-				"action": map[string]string{"type": "message", "text": "เช็คอิน"},
+				"bounds": map[string]int{"x": 0, "y": 0, "width": 833, "height": 843},
+				"action": map[string]string{
+					"type":  "uri",
+					"label": "เช็คอิน",
+					"uri":   fmt.Sprintf("%s?path=checkin", liffBase),
+				},
 			},
 			{
-				"bounds": map[string]int{"x": 1250, "y": 0, "width": 1250, "height": 843},
-				"action": map[string]string{"type": "message", "text": "เช็คเอาท์"},
+				"bounds": map[string]int{"x": 833, "y": 0, "width": 833, "height": 843},
+				"action": map[string]string{
+					"type":  "uri",
+					"label": "ลางาน",
+					"uri":   fmt.Sprintf("%s?path=leave", liffBase),
+				},
+			},
+			{
+				"bounds": map[string]int{"x": 1666, "y": 0, "width": 834, "height": 843},
+				"action": map[string]string{
+					"type":  "uri",
+					"label": "ประวัติการทำงาน",
+					"uri":   fmt.Sprintf("%s?path=history", liffBase),
+				},
 			},
 		},
 	}

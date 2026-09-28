@@ -51,7 +51,7 @@ jobs:
             echo "DB_NAME=mebot_db" >> .env
             echo "DB_ROOT_PASSWORD=${{ secrets.DB_ROOT_PASSWORD }}" >> .env
             echo "LINE_LOGIN_CLIENT_ID=${{ secrets.LINE_LOGIN_CLIENT_ID }}" >> .env
-            echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
-            echo "LEAVE_LIFF_URL=${{ secrets.LEAVE_LIFF_URL }}" >> .env
+            echo "STAFF_LIFF_URL=${{ secrets.STAFF_LIFF_URL }}" >> .env
+            echo "LEAVE_LIFF_URL=${{ secrets.STAFF_LIFF_URL || secrets.LEAVE_LIFF_URL }}" >> .env
             docker compose pull app
             docker compose up -d app

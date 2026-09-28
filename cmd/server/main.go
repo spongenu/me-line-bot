@@ -27,7 +27,7 @@ func main() {
 	attRepo := repository.NewAttendanceRepository(db)
 
 	// Rich Menu
-	richMenuSvc := service.NewRichMenuService(cfg.LineAccessToken)
+	richMenuSvc := service.NewRichMenuService(cfg.LineAccessToken, cfg.StaffLiffURL)
 	if err := richMenuSvc.Setup(
 		"assets/richmenu/menu_a.png",
 		"assets/richmenu/menu_b.png",
@@ -64,6 +64,10 @@ func main() {
 	requireAuth := middleware.RequireAuth(cfg.JWTSecret)
 	mux.Handle("/api/user/leave-requests", requireAuth(http.HandlerFunc(userHandler.CreateLeaveRequestHandler)))
 	mux.Handle("/api/user/leave-balances", requireAuth(http.HandlerFunc(userHandler.GetUserLeaveBalancesHandler)))
+	mux.Handle("/api/user/shop-info", requireAuth(http.HandlerFunc(userHandler.GetShopInfoHandler)))
+	mux.Handle("/api/user/attendance/status", requireAuth(http.HandlerFunc(userHandler.GetAttendanceStatusHandler)))
+	mux.Handle("/api/user/attendance/record", requireAuth(http.HandlerFunc(userHandler.RecordAttendanceHandler)))
+	mux.Handle("/api/user/attendance/history", requireAuth(http.HandlerFunc(userHandler.GetAttendanceHistoryHandler)))
 	mux.Handle("/api/admin/users", requireAdmin(http.HandlerFunc(adminHandler.GetUsersHandler)))
 	mux.Handle("/api/admin/users/role", requireAdmin(http.HandlerFunc(adminHandler.UpdateUserRoleHandler)))
 	mux.Handle("/api/admin/users/leave-quotas", requireAdmin(http.HandlerFunc(adminHandler.GetUserLeaveQuotasHandler)))
@@ -76,6 +80,7 @@ func main() {
 	mux.Handle("/api/admin/schedules/update", requireAdmin(http.HandlerFunc(adminHandler.UpdateUserScheduleHandler)))
 	mux.Handle("/api/admin/system", requireAdmin(http.HandlerFunc(adminHandler.GetSystemSettingsHandler)))
 	mux.Handle("/api/admin/system/toggle", requireAdmin(http.HandlerFunc(adminHandler.ToggleSystemHandler)))
+	mux.Handle("/api/admin/system/notify-group/toggle", requireAdmin(http.HandlerFunc(adminHandler.ToggleNotifyGroupHandler)))
 	mux.Handle("/api/admin/settings/leave-quotas", requireAdmin(http.HandlerFunc(adminHandler.GetDefaultLeaveQuotasHandler)))
 	mux.Handle("/api/admin/settings/leave-quotas/update", requireAdmin(http.HandlerFunc(adminHandler.UpdateDefaultLeaveQuotasHandler)))
 	mux.Handle("/api/admin/settings/leave-quotas/sync", requireAdmin(http.HandlerFunc(adminHandler.SyncAnnualLeaveQuotasHandler)))

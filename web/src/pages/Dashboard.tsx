@@ -8,6 +8,7 @@ interface DashboardData {
   forgotCheckout: number;
   chartData: { date: string; hours: number }[];
   systemOpen: boolean;
+  notifyGroup: boolean;
   lineQuota: number;
 }
 
@@ -18,6 +19,7 @@ export default function Dashboard() {
     forgotCheckout: 0,
     chartData: [],
     systemOpen: true,
+    notifyGroup: true,
     lineQuota: 0
   });
   const [loading, setLoading] = useState(true);
@@ -72,6 +74,7 @@ export default function Dashboard() {
         forgotCheckout,
         chartData,
         systemOpen: system.system_open,
+        notifyGroup: system.notify_group,
         lineQuota: system.line_quota
       });
 
@@ -86,14 +89,14 @@ export default function Dashboard() {
     fetchDashboardData();
   }, []);
 
-  const toggleSystem = async () => {
+  const toggleNotifyGroup = async () => {
     try {
-      const newState = !data.systemOpen;
-      await api.put('/admin/system/toggle', { system_open: newState });
-      setData(prev => ({ ...prev, systemOpen: newState }));
-      alert(newState ? 'เปิดระบบรับเช็คอินแล้ว' : 'ปิดระบบชั่วคราวแล้ว');
+      const newState = !data.notifyGroup;
+      await api.put('/admin/system/notify-group/toggle', { notify_group: newState });
+      setData(prev => ({ ...prev, notifyGroup: newState }));
+      // No alert needed for a simple toggle, or we can keep it
     } catch (err) {
-      alert('เกิดข้อผิดพลาดในการเปลี่ยนสถานะระบบ');
+      alert('เกิดข้อผิดพลาดในการเปลี่ยนสถานะการแจ้งเตือน');
     }
   };
 
@@ -122,13 +125,13 @@ export default function Dashboard() {
           <div className="flex items-center space-x-2">
             <span className="text-sm text-gray-500 font-medium">แจ้งเตือนลงกลุ่ม:</span>
             <button 
-              onClick={toggleSystem}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${data.systemOpen ? 'bg-green-500' : 'bg-red-500'}`}
+              onClick={toggleNotifyGroup}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${data.notifyGroup ? 'bg-green-500' : 'bg-red-500'}`}
             >
-              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${data.systemOpen ? 'translate-x-6' : 'translate-x-1'}`} />
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${data.notifyGroup ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>
-            <span className={`text-sm font-bold ${data.systemOpen ? 'text-green-600' : 'text-red-500'}`}>
-              {data.systemOpen ? 'เปิด' : 'ปิด'}
+            <span className={`text-sm font-bold ${data.notifyGroup ? 'text-green-600' : 'text-red-500'}`}>
+              {data.notifyGroup ? 'เปิด' : 'ปิด'}
             </span>
           </div>
         </div>

@@ -93,9 +93,18 @@ func (r *UserRepository) FindAllActive(users *[]model.User) error {
 
 func (r *UserRepository) IsSystemOpen() bool {
 	var status model.SystemSetting
-	err := r.db.Where(model.SystemSetting{KeyName: "system_open"}).FirstOrCreate(&status, model.SystemSetting{KeyName: "system_open", Value: "true"}).Error
+	err := r.db.Where(model.SystemSetting{KeyName: "system_open"}).Attrs(model.SystemSetting{Value: "true"}).FirstOrCreate(&status).Error
 	if err != nil {
 		return true // Default to open if error
+	}
+	return status.Value == "true"
+}
+
+func (r *UserRepository) IsGroupNotifyEnabled() bool {
+	var status model.SystemSetting
+	err := r.db.Where(model.SystemSetting{KeyName: "notify_group"}).Attrs(model.SystemSetting{Value: "true"}).FirstOrCreate(&status).Error
+	if err != nil {
+		return true // Default to true if error
 	}
 	return status.Value == "true"
 }

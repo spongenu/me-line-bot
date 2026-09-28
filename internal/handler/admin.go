@@ -336,7 +336,11 @@ func (h *AdminHandler) GetSystemSettingsHandler(w http.ResponseWriter, r *http.R
 
 	// Get system open status
 	var status model.SystemSetting
-	h.DB.Where(model.SystemSetting{KeyName: "system_open"}).FirstOrCreate(&status, model.SystemSetting{KeyName: "system_open", Value: "true"})
+	h.DB.Where(model.SystemSetting{KeyName: "system_open"}).Attrs(model.SystemSetting{Value: "true"}).FirstOrCreate(&status)
+
+	// Get notify group status
+	var notifyStatus model.SystemSetting
+	h.DB.Where(model.SystemSetting{KeyName: "notify_group"}).Attrs(model.SystemSetting{Value: "true"}).FirstOrCreate(&notifyStatus)
 
 	// Get LINE Quota
 	var quotaUsage int64 = 0
@@ -350,8 +354,9 @@ func (h *AdminHandler) GetSystemSettingsHandler(w http.ResponseWriter, r *http.R
 	}
 
 	response := map[string]interface{}{
-		"system_open": status.Value == "true",
-		"line_quota":  quotaUsage,
+		"system_open":  status.Value == "true",
+		"notify_group": notifyStatus.Value == "true",
+		"line_quota":   quotaUsage,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -373,7 +378,7 @@ func (h *AdminHandler) ToggleSystemHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	var status model.SystemSetting
-	h.DB.Where(model.SystemSetting{KeyName: "system_open"}).FirstOrCreate(&status, model.SystemSetting{KeyName: "system_open", Value: "true"})
+	h.DB.Where(model.SystemSetting{KeyName: "system_open"}).Attrs(model.SystemSetting{Value: "true"}).FirstOrCreate(&status)
 
 	if reqBody.SystemOpen {
 		status.Value = "true"
@@ -453,10 +458,7 @@ func (h *AdminHandler) UpdateDefaultLeaveQuotasHandler(w http.ResponseWriter, r 
 		}
 		keyName := "default_quota_" + item.LeaveType
 		var setting model.SystemSetting
-		h.DB.Where(model.SystemSetting{KeyName: keyName}).FirstOrCreate(&setting, model.SystemSetting{
-			KeyName: keyName,
-			Value:   strconv.Itoa(item.TotalDays),
-		})
+		h.DB.Where(model.SystemSetting{KeyName: keyName}).Attrs(model.SystemSetting{Value: strconv.Itoa(item.TotalDays)}).FirstOrCreate(&setting)
 		setting.Value = strconv.Itoa(item.TotalDays)
 		h.DB.Save(&setting)
 	}
@@ -634,3 +636,31 @@ func (h *AdminHandler) UpdateUserLeaveQuotasHandler(w http.ResponseWriter, r *ht
 	json.NewEncoder(w).Encode(map[string]string{"message": "User leave quotas updated successfully"})
 }
 
+func (h *AdminHandler) ToggleNotifyGroupHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var reqBody struct {
+		NotifyGroup bool `json:"notify_group"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	var status model.SystemSetting
+	h.DB.Where(model.SystemSetting{KeyName: "notify_group"}).Attrs(model.SystemSetting{Value: "true"}).FirstOrCreate(&status)
+
+	if reqBody.NotifyGroup {
+		status.Value = "true"
+	} else {
+		status.Value = "false"
+	}
+
+	h.DB.Save(&status)
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]bool{"notify_group": reqBody.NotifyGroup})
+}

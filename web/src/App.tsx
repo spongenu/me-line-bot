@@ -6,7 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Users from './pages/Users';
 import Attendances from './pages/Attendances';
 import Leaves from './pages/Leaves';
-import EmployeeLeave from './pages/EmployeeLeave';
+import StaffPortal from './pages/StaffPortal';
 import Settings from './pages/Settings';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -39,9 +39,13 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public Routes - Employee Leave (No Admin AuthContext interference) */}
-        <Route path="/leave" element={<EmployeeLeave />} />
-        <Route path="/leave/*" element={<EmployeeLeave />} />
+        {/* Staff Portal Routes (Single LIFF entry & Standalone paths) */}
+        <Route path="/staff" element={<StaffPortal />} />
+        <Route path="/staff/*" element={<StaffPortal />} />
+        <Route path="/leave" element={<StaffPortal defaultTab="leave" />} />
+        <Route path="/leave/*" element={<StaffPortal defaultTab="leave" />} />
+        <Route path="/checkin" element={<StaffPortal defaultTab="checkin" />} />
+        <Route path="/history" element={<StaffPortal defaultTab="history" />} />
         
         {/* Admin Routes (Wrapped in AuthProvider via pathless layout route) */}
         <Route element={<AdminLayoutWrapper />}>
@@ -56,8 +60,8 @@ function App() {
           </Route>
         </Route>
 
-        {/* Catch-all redirect to /leave */}
-        <Route path="*" element={<Navigate to="/leave" replace />} />
+        {/* Catch-all redirect to /staff */}
+        <Route path="*" element={<Navigate to="/staff" replace />} />
       </Routes>
     </BrowserRouter>
   );

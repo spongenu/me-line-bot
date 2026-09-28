@@ -28,19 +28,27 @@ export default function EmployeeLeave() {
   useEffect(() => {
     const initLiff = async () => {
       try {
-        await liff.init({ liffId: import.meta.env.VITE_LIFF_LEAVE_ID });
-        if (!liff.isLoggedIn()) {
+        const staffLiffId = import.meta.env.VITE_LIFF_STAFF_ID || import.meta.env.VITE_LIFF_LEAVE_ID;
+        if (staffLiffId && !liff.id) {
+          await liff.init({ liffId: staffLiffId });
+        }
+        
+        if (liff.id && !liff.isLoggedIn()) {
           liff.login({ redirectUri: window.location.href });
           return;
         }
         
-        const p = await liff.getProfile();
-        setProfile(p);
-        
-        // Authenticate with backend to get JWT
-        const idToken = liff.getIDToken();
-        const res = await api.post('/auth/verify-liff', { id_token: idToken });
-        localStorage.setItem('token', res.data.token);
+        if (liff.isLoggedIn()) {
+          const p = await liff.getProfile();
+          setProfile(p);
+          
+          // Authenticate with backend to get JWT
+          const idToken = liff.getIDToken();
+          if (idToken) {
+            const res = await api.post('/auth/verify-liff', { id_token: idToken });
+            localStorage.setItem('token', res.data.token);
+          }
+        }
 
         // Fetch user leave balances
         try {

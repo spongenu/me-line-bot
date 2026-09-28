@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -214,3 +215,225 @@ func (h *UserHandler) CreateLeaveRequestHandler(w http.ResponseWriter, r *http.R
 	json.NewEncoder(w).Encode(leaveReq)
 }
 
+// ── Checkin & Attendance APIs ──
+
+func (h *UserHandler) GetShopInfoHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var shop model.Shop
+	if err := h.DB.First(&shop).Error; err != nil {
+		http.Error(w, "Shop not found", http.StatusNotFound)
+		return
+	}
+
+	response := map[string]interface{}{
+		"id":       shop.ID,
+		"name":     shop.Name,
+		"lat":      shop.Lat,
+		"lng":      shop.Lng,
+		"radius_m": shop.RadiusM,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+func (h *UserHandler) GetAttendanceStatusHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	claims, ok := r.Context().Value(middleware.UserContextKey).(*middleware.Claims)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	loc, _ := time.LoadLocation("Asia/Bangkok")
+	today := time.Now().In(loc).Format("2006-01-02")
+
+	var att model.Attendance
+	err := h.DB.Where("user_id = ? AND work_date = ?", claims.UserID, today).First(&att).Error
+
+	response := map[string]interface{}{
+		"has_checked_in":  false,
+		"has_checked_out": false,
+		"check_in_time":   nil,
+		"check_out_time":  nil,
+	}
+
+	if err == nil {
+		response["has_checked_in"] = true
+		response["check_in_time"] = att.CheckInTime
+		if att.CheckOutTime != nil {
+			response["has_checked_out"] = true
+			response["check_out_time"] = att.CheckOutTime
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+func (h *UserHandler) RecordAttendanceHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	claims, ok := r.Context().Value(middleware.UserContextKey).(*middleware.Claims)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req struct {
+		Action string  `json:"action"` // "checkin" or "checkout"
+		Lat    float64 `json:"lat"`
+		Lng    float64 `json:"lng"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	// Fetch shop to get radius and center
+	var shop model.Shop
+	if err := h.DB.First(&shop).Error; err != nil {
+		http.Error(w, "Shop not found", http.StatusInternalServerError)
+		return
+	}
+
+	// Calculate distance
+	// Haversine inline to avoid import cycles
+	const R = 6371000
+	toRad := func(deg float64) float64 { return deg * 3.141592653589793 / 180 }
+	dLat := toRad(shop.Lat - req.Lat)
+	dLng := toRad(shop.Lng - req.Lng)
+	a := (math.Sin(dLat/2) * math.Sin(dLat/2)) + (math.Cos(toRad(req.Lat)) * math.Cos(toRad(shop.Lat)) * math.Sin(dLng/2) * math.Sin(dLng/2))
+	distance := R * 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+
+	if distance > float64(shop.RadiusM) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"error":    fmt.Sprintf("ระยะทางของคุณห่างจากร้านเกินไป (ห่าง %.0f เมตร / อนุญาต %d เมตร)", distance, shop.RadiusM),
+			"distance": distance,
+		})
+		return
+	}
+
+	loc, _ := time.LoadLocation("Asia/Bangkok")
+	now := time.Now().In(loc)
+	today := now.Format("2006-01-02")
+
+	var att model.Attendance
+	err := h.DB.Where("user_id = ? AND work_date = ?", claims.UserID, today).First(&att).Error
+
+	if req.Action == "checkin" {
+		if err == nil {
+			http.Error(w, "คุณเช็คอินไปแล้ววันนี้", http.StatusBadRequest)
+			return
+		}
+		newAtt := model.Attendance{
+			UserID:      claims.UserID,
+			ShopID:      shop.ID,
+			WorkDate:    today,
+			CheckInTime: &now,
+			CheckInLat:  req.Lat,
+			CheckInLng:  req.Lng,
+			CreatedAt:   now,
+		}
+		h.DB.Create(&newAtt)
+	} else if req.Action == "checkout" {
+		if err != nil {
+			http.Error(w, "คุณยังไม่ได้เช็คอินวันนี้", http.StatusBadRequest)
+			return
+		}
+		if att.CheckOutTime != nil {
+			http.Error(w, "คุณเช็คเอาท์ไปแล้ววันนี้", http.StatusBadRequest)
+			return
+		}
+
+		// Calculate duration
+		if att.CheckInTime != nil {
+			duration := now.Sub(*att.CheckInTime).Minutes()
+			if duration < 0 {
+				duration = 0
+			}
+			att.WorkDurationMin = int(duration)
+		}
+
+		att.CheckOutTime = &now
+		att.CheckOutLat = req.Lat
+		att.CheckOutLng = req.Lng
+		h.DB.Save(&att)
+	} else {
+		http.Error(w, "Invalid action", http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message":  "Success",
+		"distance": distance,
+	})
+}
+
+type AttendanceHistoryResponse struct {
+	Month          string               `json:"month"`
+	TotalWorkDays  int                  `json:"total_work_days"`
+	TotalWorkHours float64              `json:"total_work_hours"`
+	Records        []model.Attendance   `json:"records"`
+	LeaveRecords   []model.LeaveRequest `json:"leave_records"`
+}
+
+func (h *UserHandler) GetAttendanceHistoryHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	claims, ok := r.Context().Value(middleware.UserContextKey).(*middleware.Claims)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	month := r.URL.Query().Get("month")
+	if month == "" {
+		loc, _ := time.LoadLocation("Asia/Bangkok")
+		month = time.Now().In(loc).Format("2006-01")
+	}
+
+	monthPrefix := month + "%"
+	var attendances []model.Attendance
+	h.DB.Where("user_id = ? AND work_date LIKE ?", claims.UserID, monthPrefix).
+		Order("work_date desc").
+		Find(&attendances)
+
+	var leaves []model.LeaveRequest
+	h.DB.Where("user_id = ? AND (start_date LIKE ? OR end_date LIKE ?) AND status = 'approved'", claims.UserID, monthPrefix, monthPrefix).
+		Order("start_date desc").
+		Find(&leaves)
+
+	totalWorkDays := len(attendances)
+	totalMinutes := 0
+	for _, att := range attendances {
+		totalMinutes += att.WorkDurationMin
+	}
+	totalHours := float64(totalMinutes) / 60.0
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(AttendanceHistoryResponse{
+		Month:          month,
+		TotalWorkDays:  totalWorkDays,
+		TotalWorkHours: totalHours,
+		Records:        attendances,
+		LeaveRecords:   leaves,
+	})
+}
