@@ -137,7 +137,7 @@ export default function Attendances() {
     // Start with actual attendances
     const rows: any[] = attendances.map(a => ({
       type: 'attendance',
-      dateStr: a.CheckInTime ? a.CheckInTime.substring(0, 10) : a.WorkDate,
+      dateStr: a.WorkDate || (a as any).work_date,
       user: a.User,
       att: a
     }));
@@ -151,8 +151,11 @@ export default function Attendances() {
     const [year, month] = selectedMonth.split('-');
     const daysInMonth = new Date(parseInt(year), parseInt(month), 0).getDate();
     
-    const todayStr = new Date().toISOString().substring(0, 10);
-    const endDay = selectedMonth === todayStr.substring(0, 7) ? new Date().getDate() : daysInMonth;
+    const now = new Date();
+    const localYear = now.getFullYear();
+    const localMonth = String(now.getMonth() + 1).padStart(2, '0');
+    
+    const endDay = selectedMonth === `${localYear}-${localMonth}` ? now.getDate() : daysInMonth;
 
     staffUsers.forEach(user => {
       // Find user schedules
@@ -185,11 +188,12 @@ export default function Attendances() {
         }
 
         // Determine if it's a scheduled work day
-        const dateObj = new Date(dateStr);
+        const [yStr, mStr, dStr] = dateStr.split('-');
+        const dateObj = new Date(parseInt(yStr), parseInt(mStr) - 1, parseInt(dStr));
         const dayOfWeek = dateObj.getDay(); // 0=Sun, 1=Mon
         
         const activeSched = userScheds.find(s => dateStr >= s.EffectiveFrom.substring(0, 10));
-        if (activeSched && activeSched.WorkingDays) {
+        if (activeSched && activeSched.WorkingDays && activeSched.WorkingDays.trim() !== '') {
           const workingDays = activeSched.WorkingDays.split(',').map(Number);
           if (workingDays.includes(dayOfWeek)) {
             rows.push({

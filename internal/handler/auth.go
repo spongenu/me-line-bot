@@ -75,7 +75,7 @@ func (h *AuthHandler) VerifyLiffHandler(w http.ResponseWriter, r *http.Request) 
 			hasStaff = true
 		}
 	}
-	
+
 	if hasAdmin {
 		roleName = "admin"
 	} else if hasStaff {

@@ -82,4 +82,3 @@ func seedSettings(db *gorm.DB) {
 	}
 	log.Println("Default leave settings seeded")
 }
-
