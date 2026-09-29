@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
-import { Calendar, Briefcase } from 'lucide-react';
+import { Calendar, Briefcase, Shield, Check } from 'lucide-react';
 
 interface Role {
   Name: string;
@@ -23,6 +23,12 @@ export default function Users() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [roleFilter, setRoleFilter] = useState('staff');
+
+  // Role Modal State
+  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
+  const [roleUser, setRoleUser] = useState<User | null>(null);
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [savingRoles, setSavingRoles] = useState(false);
 
   // Schedule Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -58,20 +64,34 @@ export default function Users() {
     fetchUsers();
   }, []);
 
-  const changeRole = async (userId: number, currentRole: string) => {
-    const roles = ['customer', 'staff', 'admin'];
-    let currentIndex = roles.indexOf(currentRole);
-    if (currentIndex === -1) currentIndex = 0;
-    
-    const nextRole = roles[(currentIndex + 1) % roles.length];
-    
-    if (confirm(`คุณต้องการเปลี่ยนสิทธิ์ผู้ใช้นี้เป็น "${nextRole.toUpperCase()}" ใช่หรือไม่?`)) {
-      try {
-        await api.put(`/admin/users/role?user_id=${userId}`, { role_name: nextRole });
-        fetchUsers();
-      } catch (err) {
-        alert('เกิดข้อผิดพลาดในการเปลี่ยนสิทธิ์');
-      }
+  const openRoleModal = (user: User) => {
+    setRoleUser(user);
+    const currentRoles = (user.UserRoles || []).map(ur => ur.Role.Name.toLowerCase());
+    setSelectedRoles(currentRoles);
+    setIsRoleModalOpen(true);
+  };
+
+  const toggleRole = (roleName: string) => {
+    if (selectedRoles.includes(roleName)) {
+      setSelectedRoles(selectedRoles.filter(r => r !== roleName));
+    } else {
+      setSelectedRoles([...selectedRoles, roleName]);
+    }
+  };
+
+  const saveRoles = async () => {
+    if (!roleUser) return;
+    setSavingRoles(true);
+    try {
+      await api.put(`/admin/users/role?user_id=${roleUser.ID}`, {
+        roles: selectedRoles
+      });
+      setIsRoleModalOpen(false);
+      fetchUsers();
+    } catch (err) {
+      alert('เกิดข้อผิดพลาดในการบันทึกสิทธิ์');
+    } finally {
+      setSavingRoles(false);
     }
   };
 
@@ -138,10 +158,17 @@ export default function Users() {
           qMap[item.leave_type] = item.total_days;
         });
         setUserQuotas(qMap);
-        setUsedDaysMap(data.used_days_map || {});
+      } else {
+        setUserQuotas({ 'ลาป่วย': 30, 'ลากิจ': 3, 'ลาพักร้อน': 6 });
+      }
+
+      if (data && data.used) {
+        setUsedDaysMap(data.used);
+      } else {
+        setUsedDaysMap({});
       }
     } catch (err) {
-      console.error('Error fetching user leave quotas', err);
+      console.error('Failed to fetch quotas', err);
     }
   };
 
@@ -156,21 +183,14 @@ export default function Users() {
     if (!quotaUser) return;
     setSavingQuota(true);
     try {
-      const quotasArray = Object.entries(userQuotas).map(([type, days]) => ({
-        leave_type: type,
-        total_days: Number(days) || 0
-      }));
-
-      await api.put('/admin/users/leave-quotas/update', {
-        user_id: quotaUser.ID,
+      await api.put(`/admin/users/leave-quotas/update?user_id=${quotaUser.ID}`, {
         year: quotaYear,
-        quotas: quotasArray
+        quotas: userQuotas
       });
-
       alert('บันทึกโควตาวันลาสำเร็จ');
       setIsQuotaModalOpen(false);
     } catch (err) {
-      alert('เกิดข้อผิดพลาดในการบันทึกโควตาวันลา');
+      alert('เกิดข้อผิดพลาดในการบันทึกโควตา');
     } finally {
       setSavingQuota(false);
     }
@@ -186,93 +206,137 @@ export default function Users() {
     { id: 0, name: 'อาทิตย์' }
   ];
 
-  if (loading) return <div className="text-center p-10 text-gray-500">กำลังโหลดข้อมูลพนักงาน...</div>;
+  // Filter users based on tab
+  const filteredUsers = users.filter(user => {
+    if (roleFilter === 'all') return true;
+    const userRoles = (user.UserRoles || []).map(ur => ur.Role.Name.toLowerCase());
+    return userRoles.includes(roleFilter);
+  });
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
+      {/* Header & Filter Tabs */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">จัดการพนักงาน</h2>
-          <p className="text-gray-500">จัดการสิทธิ์ (Role), วันทำงาน และโควตาวันลาของพนักงาน</p>
+          <h2 className="text-2xl font-bold text-gray-800">จัดการสิทธิ์ผู้ใช้งาน</h2>
+          <p className="text-sm text-gray-500 mt-1">กำหนดบทบาท สิทธิ์การเข้าถึง และตารางการทำงานของพนักงาน</p>
         </div>
-        <div className="flex bg-gray-100 p-1 rounded-lg">
-          <button onClick={() => setRoleFilter('staff')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${roleFilter === 'staff' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>พนักงาน (Staff)</button>
-          <button onClick={() => setRoleFilter('admin')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${roleFilter === 'admin' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>แอดมิน</button>
-          <button onClick={() => setRoleFilter('customer')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${roleFilter === 'customer' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>ลูกค้า</button>
-          <button onClick={() => setRoleFilter('all')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${roleFilter === 'all' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>ทั้งหมด</button>
+
+        {/* Tab Filters */}
+        <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200">
+          <button
+            onClick={() => setRoleFilter('staff')}
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
+              roleFilter === 'staff' 
+                ? 'bg-white text-blue-600 shadow-sm' 
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            พนักงาน (Staff)
+          </button>
+          <button
+            onClick={() => setRoleFilter('admin')}
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
+              roleFilter === 'admin' 
+                ? 'bg-white text-purple-600 shadow-sm' 
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            ผู้ดูแล (Admin)
+          </button>
+          <button
+            onClick={() => setRoleFilter('customer')}
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
+              roleFilter === 'customer' 
+                ? 'bg-white text-gray-800 shadow-sm' 
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            ลูกค้า (Customer)
+          </button>
+          <button
+            onClick={() => setRoleFilter('all')}
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
+              roleFilter === 'all' 
+                ? 'bg-white text-gray-800 shadow-sm' 
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            ทั้งหมด ({users.length})
+          </button>
         </div>
       </div>
 
+      {/* Users List */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        {/* Desktop Header */}
-        <div className="hidden md:grid grid-cols-12 gap-4 p-4 bg-gray-50 border-b border-gray-100">
-          <div className="col-span-4 font-semibold text-gray-600 text-sm">ผู้ใช้งาน</div>
-          <div className="col-span-2 font-semibold text-gray-600 text-sm">สิทธิ์ (Role)</div>
-          <div className="col-span-6 font-semibold text-gray-600 text-sm text-right">จัดการ</div>
+        <div className="p-4 border-b border-gray-100 hidden md:grid grid-cols-12 text-xs font-bold text-gray-400 uppercase tracking-wider">
+          <div className="col-span-4">ผู้ใช้งาน</div>
+          <div className="col-span-2">สิทธิ์ปัจจุบัน</div>
+          <div className="col-span-6 text-right">การจัดการ</div>
         </div>
 
-        {/* User List */}
         <div className="divide-y divide-gray-100">
-          {users.filter(user => {
-            if (roleFilter === 'all') return true;
-            const userRoles = user.UserRoles && user.UserRoles.length > 0 
-              ? user.UserRoles.map(ur => ur.Role.Name) 
-              : ['customer'];
-            return userRoles.includes(roleFilter);
-          }).map((user) => {
-            const userRoles = user.UserRoles && user.UserRoles.length > 0 
-              ? user.UserRoles.map(ur => ur.Role.Name) 
-              : ['customer'];
-            
+          {loading ? (
+            <div className="p-8 text-center text-gray-400">กำลังโหลดข้อมูล...</div>
+          ) : filteredUsers.length === 0 ? (
+            <div className="p-8 text-center text-gray-400">ไม่พบผู้ใช้งานในหมวดหมู่นี้</div>
+          ) : filteredUsers.map((user) => {
+            const userRoles = (user.UserRoles || []).map(ur => ur.Role.Name.toLowerCase());
             return (
-              <div key={user.ID} className="flex flex-col md:grid md:grid-cols-12 gap-4 p-4 hover:bg-gray-50 transition-colors md:items-center">
+              <div key={user.ID} className="p-4 flex flex-col md:grid md:grid-cols-12 items-start md:items-center justify-between hover:bg-gray-50/80 transition-colors">
                 {/* User Info */}
-                <div className="col-span-4 flex items-center space-x-3">
+                <div className="col-span-4 flex items-center space-x-3 w-full">
                   {user.PictureURL ? (
-                    <img src={user.PictureURL} alt="" className="w-10 h-10 rounded-full" />
+                    <img src={user.PictureURL} alt={user.DisplayName || user.Name} className="w-10 h-10 rounded-full object-cover border border-gray-100 shadow-sm" />
                   ) : (
-                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs">
-                      {user.DisplayName?.charAt(0) || user.Name.charAt(0) || '?'}
+                    <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 font-bold flex items-center justify-center text-sm shadow-sm">
+                      {(user.DisplayName || user.Name || 'U').charAt(0)}
                     </div>
                   )}
                   <div>
-                    <p className="font-bold text-gray-800">{user.DisplayName || user.Name}</p>
+                    <h4 className="font-bold text-gray-800 text-sm">{user.DisplayName || user.Name}</h4>
                     <p className="text-xs text-gray-400">ID: {user.ID} | {user.LineUserID.substring(0, 10)}...</p>
                   </div>
                 </div>
 
                 {/* Roles */}
                 <div className="col-span-2 flex flex-wrap gap-1.5 mt-2 md:mt-0">
-                  {userRoles.map((roleName, idx) => (
-                    <span key={idx} className={`px-3 py-1 text-[10px] font-bold rounded-full ${
-                      roleName === 'admin' ? 'bg-purple-100 text-purple-700' :
-                      roleName === 'staff' ? 'bg-green-100 text-green-700' :
-                      'bg-gray-100 text-gray-600'
-                    }`}>
-                      {roleName.toUpperCase()}
+                  {userRoles.length === 0 ? (
+                    <span className="px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-gray-100 text-gray-500">
+                      CUSTOMER
                     </span>
-                  ))}
+                  ) : (
+                    userRoles.map((roleName, idx) => (
+                      <span key={idx} className={`px-2.5 py-0.5 text-[10px] font-bold rounded-full ${
+                        roleName === 'admin' ? 'bg-purple-100 text-purple-700' :
+                        roleName === 'staff' ? 'bg-blue-100 text-blue-700' :
+                        'bg-gray-100 text-gray-600'
+                      }`}>
+                        {roleName.toUpperCase()}
+                      </span>
+                    ))
+                  )}
                 </div>
 
                 {/* Actions */}
-                <div className="col-span-6 flex flex-wrap gap-2 mt-3 md:mt-0 md:justify-end">
+                <div className="col-span-6 flex flex-wrap gap-2 mt-3 md:mt-0 md:justify-end w-full md:w-auto">
                   <button 
                     onClick={() => openQuotaModal(user)}
-                    className="text-amber-700 hover:text-amber-900 text-sm font-medium bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center flex-1 md:flex-none justify-center"
+                    className="text-amber-700 hover:text-amber-900 text-xs font-semibold bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center flex-1 md:flex-none justify-center"
                   >
-                    <Briefcase size={16} className="mr-1" /> โควตาวันลา
+                    <Briefcase size={14} className="mr-1" /> โควตาวันลา
                   </button>
                   <button 
                     onClick={() => openScheduleModal(user)}
-                    className="text-indigo-600 hover:text-indigo-800 text-sm font-medium bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center flex-1 md:flex-none justify-center"
+                    className="text-indigo-600 hover:text-indigo-800 text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center flex-1 md:flex-none justify-center"
                   >
-                    <Calendar size={16} className="mr-1" /> วันทำงาน
+                    <Calendar size={14} className="mr-1" /> วันทำงาน
                   </button>
                   <button 
-                    onClick={() => changeRole(user.ID, userRoles[0])}
-                    className="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors flex-1 md:flex-none justify-center"
+                    onClick={() => openRoleModal(user)}
+                    className="text-blue-600 hover:text-blue-800 text-xs font-semibold bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center flex-1 md:flex-none justify-center"
                   >
-                    สลับสิทธิ์
+                    <Shield size={14} className="mr-1" /> กำหนดสิทธิ์
                   </button>
                 </div>
               </div>
@@ -280,6 +344,121 @@ export default function Users() {
           })}
         </div>
       </div>
+
+      {/* Role Modal with Multi-select Chips */}
+      {isRoleModalOpen && roleUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-gray-100">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <Shield className="w-5 h-5 text-blue-600" />
+                กำหนดบทบาทและสิทธิ์
+              </h3>
+              <p className="text-xs text-gray-500 mt-1">{roleUser.DisplayName || roleUser.Name}</p>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                  เลือกสิทธิ์ที่ต้องการมอบหมาย (เลือกได้หลายสิทธิ์)
+                </label>
+                <div className="grid grid-cols-1 gap-2.5">
+                  {/* ADMIN CHIP */}
+                  <button
+                    type="button"
+                    onClick={() => toggleRole('admin')}
+                    className={`flex items-center justify-between p-3.5 rounded-xl border-2 transition-all text-left ${
+                      selectedRoles.includes('admin')
+                        ? 'border-purple-500 bg-purple-50/70 text-purple-900 shadow-sm'
+                        : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-600'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <span className="text-xl">👑</span>
+                      <div>
+                        <p className="font-bold text-sm">ADMIN</p>
+                        <p className="text-xs text-gray-500">ผู้ดูแลระบบ สามารถจัดการหลังบ้านได้ทั้งหมด</p>
+                      </div>
+                    </div>
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center border ${
+                      selectedRoles.includes('admin') ? 'bg-purple-600 border-purple-600 text-white' : 'border-gray-300'
+                    }`}>
+                      {selectedRoles.includes('admin') && <Check size={12} strokeWidth={3} />}
+                    </div>
+                  </button>
+
+                  {/* STAFF CHIP */}
+                  <button
+                    type="button"
+                    onClick={() => toggleRole('staff')}
+                    className={`flex items-center justify-between p-3.5 rounded-xl border-2 transition-all text-left ${
+                      selectedRoles.includes('staff')
+                        ? 'border-blue-500 bg-blue-50/70 text-blue-900 shadow-sm'
+                        : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-600'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <span className="text-xl">💼</span>
+                      <div>
+                        <p className="font-bold text-sm">STAFF</p>
+                        <p className="text-xs text-gray-500">พนักงาน สามารถตอกบัตร ลางาน และแสดงบนจอ IoT</p>
+                      </div>
+                    </div>
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center border ${
+                      selectedRoles.includes('staff') ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-300'
+                    }`}>
+                      {selectedRoles.includes('staff') && <Check size={12} strokeWidth={3} />}
+                    </div>
+                  </button>
+
+                  {/* CUSTOMER CHIP */}
+                  <button
+                    type="button"
+                    onClick={() => toggleRole('customer')}
+                    className={`flex items-center justify-between p-3.5 rounded-xl border-2 transition-all text-left ${
+                      selectedRoles.includes('customer')
+                        ? 'border-slate-500 bg-slate-50 text-slate-900 shadow-sm'
+                        : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-600'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <span className="text-xl">👤</span>
+                      <div>
+                        <p className="font-bold text-sm">CUSTOMER</p>
+                        <p className="text-xs text-gray-500">ผู้ใช้งานทั่วไป / ลูกค้า</p>
+                      </div>
+                    </div>
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center border ${
+                      selectedRoles.includes('customer') ? 'bg-slate-700 border-slate-700 text-white' : 'border-gray-300'
+                    }`}>
+                      {selectedRoles.includes('customer') && <Check size={12} strokeWidth={3} />}
+                    </div>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => setIsRoleModalOpen(false)}
+                disabled={savingRoles}
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 font-medium rounded-xl hover:bg-gray-100 transition-colors"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={saveRoles}
+                disabled={savingRoles}
+                className="px-5 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow transition-colors disabled:opacity-50"
+              >
+                {savingRoles ? 'กำลังบันทึก...' : 'บันทึกสิทธิ์'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Schedule Modal */}
       {isModalOpen && selectedUser && (
@@ -411,4 +590,3 @@ export default function Users() {
     </div>
   );
 }
-

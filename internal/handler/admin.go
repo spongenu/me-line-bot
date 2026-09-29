@@ -61,38 +61,46 @@ func (h *AdminHandler) UpdateUserRoleHandler(w http.ResponseWriter, r *http.Requ
 	}
 
 	var reqBody struct {
-		RoleName string `json:"role_name"` // "admin", "staff", "customer"
+		RoleName string   `json:"role_name"` // legacy single role
+		Roles    []string `json:"roles"`     // multi-role support
 	}
 	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
 		http.Error(w, "Bad request", http.StatusBadRequest)
 		return
 	}
 
-	var role model.Role
-	if err := h.DB.Where("name = ?", reqBody.RoleName).First(&role).Error; err != nil {
-		http.Error(w, "Role not found", http.StatusBadRequest)
+	targetRoles := reqBody.Roles
+	if len(targetRoles) == 0 && reqBody.RoleName != "" {
+		targetRoles = []string{reqBody.RoleName}
+	}
+
+	tx := h.DB.Begin()
+	// Clear existing roles
+	if err := tx.Where("user_id = ?", userID).Delete(&model.UserRole{}).Error; err != nil {
+		tx.Rollback()
+		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 
-	// Clear existing roles and set new role (simplified for 1 role per user)
-	tx := h.DB.Begin()
-	tx.Where("user_id = ?", userID).Delete(&model.UserRole{})
-
-	if reqBody.RoleName != "customer" { // If customer, they might just have no roles, or a specific customer role. Let's assume we set the role anyway.
-		userRole := model.UserRole{
-			UserID: uint(userID),
-			RoleID: role.ID,
-		}
-		if err := tx.Create(&userRole).Error; err != nil {
-			tx.Rollback()
-			http.Error(w, "Failed to update role", http.StatusInternalServerError)
-			return
+	// Insert all selected roles
+	for _, rName := range targetRoles {
+		var role model.Role
+		if err := tx.Where("name = ?", rName).First(&role).Error; err == nil {
+			userRole := model.UserRole{
+				UserID: uint(userID),
+				RoleID: role.ID,
+			}
+			if err := tx.Create(&userRole).Error; err != nil {
+				tx.Rollback()
+				http.Error(w, "Failed to update role", http.StatusInternalServerError)
+				return
+			}
 		}
 	}
 	tx.Commit()
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Role updated successfully"})
+	json.NewEncoder(w).Encode(map[string]string{"message": "Roles updated successfully"})
 }
 
 // ==================== ATTENDANCES ====================
