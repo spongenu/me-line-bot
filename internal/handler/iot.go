@@ -28,9 +28,8 @@ type StaffStatus struct {
 
 // isScheduledDay checks if dayOfWeek (0=Sun, 1=Mon, ..., 6=Sat) is in workingDaysStr (e.g. "1,2,3,4,5")
 func isScheduledDay(workingDaysStr string, dayOfWeek int) bool {
-	if workingDaysStr == "" {
-		// Default to Monday-Friday
-		return dayOfWeek >= 1 && dayOfWeek <= 5
+	if strings.TrimSpace(workingDaysStr) == "" {
+		return false
 	}
 	parts := strings.Split(workingDaysStr, ",")
 	target := strconv.Itoa(dayOfWeek)
@@ -113,17 +112,14 @@ func (h *IoTHandler) GetDailyStatusHandler(w http.ResponseWriter, r *http.Reques
 		scheduledToday := false
 		if errSched == nil {
 			scheduledToday = isScheduledDay(schedule.WorkingDays, dayOfWeek)
-		} else {
-			// Default schedule is Mon-Fri if not explicitly configured
-			scheduledToday = isScheduledDay("1,2,3,4,5", dayOfWeek)
 		}
 
-		// If today is a scheduled work day and they haven't checked in / taken leave -> Absent
+		// Only if today is an explicitly scheduled work day and they haven't checked in / taken leave -> Absent
 		if scheduledToday {
 			status.Status = "absent"
 			staffList = append(staffList, status)
 		}
-		// If not scheduled today (Day Off) and no attendance, they are omitted from the list
+		// If no schedule exists or not scheduled today (Day Off) and no attendance, they are omitted from the list
 	}
 
 	response := map[string]interface{}{
