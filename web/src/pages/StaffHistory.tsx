@@ -3,20 +3,31 @@ import { api } from '../lib/api';
 import { Calendar, Clock, ChevronLeft, ChevronRight, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 interface AttendanceRecord {
-  id: number;
-  work_date: string;
+  ID?: number;
+  id?: number;
+  WorkDate?: string;
+  work_date?: string;
+  CheckInTime?: string;
   check_in_time?: string;
+  CheckOutTime?: string;
   check_out_time?: string;
-  work_duration_min: number;
+  WorkDurationMin?: number;
+  work_duration_min?: number;
 }
 
 interface LeaveRecord {
-  id: number;
-  leave_type: string;
-  start_date: string;
-  end_date: string;
-  reason: string;
-  status: string;
+  ID?: number;
+  id?: number;
+  LeaveType?: string;
+  leave_type?: string;
+  StartDate?: string;
+  start_date?: string;
+  EndDate?: string;
+  end_date?: string;
+  Reason?: string;
+  reason?: string;
+  Status?: string;
+  status?: string;
 }
 
 interface HistoryData {
@@ -64,12 +75,29 @@ export default function StaffHistory() {
     return date.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' });
   };
 
+  const parseDate = (dateStr?: string) => {
+    if (!dateStr) return null;
+    const cleanStr = dateStr.split('T')[0];
+    const parts = cleanStr.split('-');
+    if (parts.length === 3) {
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const d = parseInt(parts[2], 10);
+      return new Date(y, m, d);
+    }
+    const dt = new Date(dateStr);
+    return isNaN(dt.getTime()) ? null : dt;
+  };
+
   const formatTime = (timeStr?: string) => {
     if (!timeStr) return '-';
-    return new Date(timeStr).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+    const dt = new Date(timeStr);
+    if (isNaN(dt.getTime())) return '-';
+    return dt.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
   };
 
   const formatHoursMinutes = (minutes: number) => {
+    if (!minutes || minutes <= 0) return '0 นาที';
     const h = Math.floor(minutes / 60);
     const m = minutes % 60;
     if (h === 0) return `${m} นาที`;
@@ -132,15 +160,21 @@ export default function StaffHistory() {
         ) : (
           <div className="space-y-2.5">
             {/* Attendance Records */}
-            {data.records.map((rec) => {
-              const dateObj = new Date(rec.work_date);
-              const dayName = dateObj.toLocaleDateString('th-TH', { weekday: 'short' });
-              const dayNumber = dateObj.getDate();
-              const hasCheckedOut = !!rec.check_out_time;
+            {data.records.map((rec, idx) => {
+              const workDateStr = rec.WorkDate || rec.work_date || '';
+              const dateObj = parseDate(workDateStr);
+              const dayName = dateObj ? dateObj.toLocaleDateString('th-TH', { weekday: 'short' }) : '-';
+              const dayNumber = dateObj ? dateObj.getDate() : '-';
+              
+              const checkIn = rec.CheckInTime || rec.check_in_time;
+              const checkOut = rec.CheckOutTime || rec.check_out_time;
+              const hasCheckedOut = !!checkOut;
+              const durationMin = rec.WorkDurationMin ?? rec.work_duration_min ?? 0;
+              const recId = rec.ID || rec.id || idx;
 
               return (
                 <div
-                  key={rec.id}
+                  key={`att-${recId}`}
                   className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between"
                 >
                   <div className="flex items-center space-x-3">
@@ -163,7 +197,7 @@ export default function StaffHistory() {
                         )}
                         {hasCheckedOut && (
                           <span className="text-xs text-gray-500 font-medium">
-                            {formatHoursMinutes(rec.work_duration_min)}
+                            {formatHoursMinutes(durationMin)}
                           </span>
                         )}
                       </div>
@@ -171,11 +205,11 @@ export default function StaffHistory() {
                       <div className="flex items-center text-xs text-gray-700 space-x-2">
                         <span className="flex items-center text-green-600 font-medium">
                           <CheckCircle2 className="w-3 h-3 mr-1" />
-                          {formatTime(rec.check_in_time)}
+                          {formatTime(checkIn)}
                         </span>
                         <span className="text-gray-300">-</span>
                         <span className={`font-medium ${hasCheckedOut ? 'text-red-500' : 'text-gray-400'}`}>
-                          {hasCheckedOut ? formatTime(rec.check_out_time) : 'ไม่ได้บันทึก'}
+                          {hasCheckedOut ? formatTime(checkOut) : 'ไม่ได้บันทึก'}
                         </span>
                       </div>
                     </div>
@@ -185,27 +219,34 @@ export default function StaffHistory() {
             })}
 
             {/* Leave Records for this month */}
-            {data.leave_records.map((leave) => (
-              <div
-                key={`leave-${leave.id}`}
-                className="bg-amber-50/50 p-4 rounded-2xl shadow-sm border border-amber-200 flex items-center justify-between"
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 rounded-xl bg-amber-100 text-amber-700 flex flex-col items-center justify-center font-bold">
-                    <span className="text-[10px] font-medium leading-none">ลา</span>
-                    <span className="text-xs mt-0.5 font-semibold">{leave.leave_type}</span>
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-amber-900">
-                      {leave.leave_type} (อนุมัติแล้ว)
+            {data.leave_records.map((leave, idx) => {
+              const leaveType = leave.LeaveType || leave.leave_type || 'ลา';
+              const startDate = leave.StartDate || leave.start_date || '';
+              const endDate = leave.EndDate || leave.end_date || '';
+              const leaveId = leave.ID || leave.id || idx;
+
+              return (
+                <div
+                  key={`leave-${leaveId}`}
+                  className="bg-amber-50/50 p-4 rounded-2xl shadow-sm border border-amber-200 flex items-center justify-between"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 rounded-xl bg-amber-100 text-amber-700 flex flex-col items-center justify-center font-bold">
+                      <span className="text-[10px] font-medium leading-none">ลา</span>
+                      <span className="text-xs mt-0.5 font-semibold">{leaveType}</span>
                     </div>
-                    <div className="text-[11px] text-gray-500 mt-0.5">
-                      {leave.start_date} ถึง {leave.end_date}
+                    <div>
+                      <div className="text-xs font-bold text-amber-900">
+                        {leaveType} (อนุมัติแล้ว)
+                      </div>
+                      <div className="text-[11px] text-gray-500 mt-0.5">
+                        {startDate} ถึง {endDate}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
