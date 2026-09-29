@@ -253,10 +253,8 @@ func (h *UserHandler) GetAttendanceStatusHandler(w http.ResponseWriter, r *http.
 	}
 
 	loc, _ := time.LoadLocation("Asia/Bangkok")
-	today := time.Now().In(loc).Format("2006-01-02")
-
-	var att model.Attendance
-	err := h.DB.Where("user_id = ? AND work_date = ?", claims.UserID, today).First(&att).Error
+	now := time.Now().In(loc)
+	today := now.Format("2006-01-02")
 
 	response := map[string]interface{}{
 		"has_checked_in":  false,
@@ -265,12 +263,35 @@ func (h *UserHandler) GetAttendanceStatusHandler(w http.ResponseWriter, r *http.
 		"check_out_time":  nil,
 	}
 
-	if err == nil {
+	// 1. Check if there's an active unclosed shift (within the last 18 hours)
+	var activeAtt model.Attendance
+	errActive := h.DB.Where("user_id = ? AND check_in_time IS NOT NULL AND check_out_time IS NULL", claims.UserID).
+		Order("check_in_time desc").
+		First(&activeAtt).Error
+
+	if errActive == nil && activeAtt.CheckInTime != nil {
+		if now.Sub(*activeAtt.CheckInTime) <= 18*time.Hour {
+			response["has_checked_in"] = true
+			response["has_checked_out"] = false
+			response["check_in_time"] = activeAtt.CheckInTime
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+	}
+
+	// 2. Otherwise, check today's record
+	var todayAtt model.Attendance
+	errToday := h.DB.Where("user_id = ? AND work_date = ?", claims.UserID, today).
+		Order("created_at desc").
+		First(&todayAtt).Error
+
+	if errToday == nil && todayAtt.CheckInTime != nil {
 		response["has_checked_in"] = true
-		response["check_in_time"] = att.CheckInTime
-		if att.CheckOutTime != nil {
+		response["check_in_time"] = todayAtt.CheckInTime
+		if todayAtt.CheckOutTime != nil {
 			response["has_checked_out"] = true
-			response["check_out_time"] = att.CheckOutTime
+			response["check_out_time"] = todayAtt.CheckOutTime
 		}
 	}
 
@@ -331,14 +352,25 @@ func (h *UserHandler) RecordAttendanceHandler(w http.ResponseWriter, r *http.Req
 	now := time.Now().In(loc)
 	today := now.Format("2006-01-02")
 
-	var att model.Attendance
-	err := h.DB.Where("user_id = ? AND work_date = ?", claims.UserID, today).First(&att).Error
-
 	if req.Action == "checkin" {
-		if err == nil {
+		// Check if already in an active unclosed shift (< 18h)
+		var activeAtt model.Attendance
+		errActive := h.DB.Where("user_id = ? AND check_in_time IS NOT NULL AND check_out_time IS NULL", claims.UserID).
+			Order("check_in_time desc").
+			First(&activeAtt).Error
+		if errActive == nil && activeAtt.CheckInTime != nil && now.Sub(*activeAtt.CheckInTime) <= 18*time.Hour {
+			http.Error(w, "คุณเช็คอินอยู่แล้ว กรุณาเช็คเอาท์ก่อน", http.StatusBadRequest)
+			return
+		}
+
+		// Also check if already completed today
+		var todayAtt model.Attendance
+		errToday := h.DB.Where("user_id = ? AND work_date = ?", claims.UserID, today).First(&todayAtt).Error
+		if errToday == nil && todayAtt.CheckInTime != nil {
 			http.Error(w, "คุณเช็คอินไปแล้ววันนี้", http.StatusBadRequest)
 			return
 		}
+
 		newAtt := model.Attendance{
 			UserID:      claims.UserID,
 			ShopID:      shop.ID,
@@ -350,28 +382,40 @@ func (h *UserHandler) RecordAttendanceHandler(w http.ResponseWriter, r *http.Req
 		}
 		h.DB.Create(&newAtt)
 	} else if req.Action == "checkout" {
-		if err != nil {
-			http.Error(w, "คุณยังไม่ได้เช็คอินวันนี้", http.StatusBadRequest)
-			return
-		}
-		if att.CheckOutTime != nil {
-			http.Error(w, "คุณเช็คเอาท์ไปแล้ววันนี้", http.StatusBadRequest)
-			return
+		// Find active unclosed shift within 18h (can be from today or yesterday)
+		var activeAtt model.Attendance
+		errActive := h.DB.Where("user_id = ? AND check_in_time IS NOT NULL AND check_out_time IS NULL", claims.UserID).
+			Order("check_in_time desc").
+			First(&activeAtt).Error
+
+		if errActive != nil || activeAtt.CheckInTime == nil || now.Sub(*activeAtt.CheckInTime) > 18*time.Hour {
+			// Fallback: check today's record
+			var todayAtt model.Attendance
+			errToday := h.DB.Where("user_id = ? AND work_date = ?", claims.UserID, today).First(&todayAtt).Error
+			if errToday != nil || todayAtt.CheckInTime == nil {
+				http.Error(w, "ไม่พบข้อมูลการเช็คอินที่ยังไม่เช็คเอาท์", http.StatusBadRequest)
+				return
+			}
+			if todayAtt.CheckOutTime != nil {
+				http.Error(w, "คุณเช็คเอาท์ไปแล้ววันนี้", http.StatusBadRequest)
+				return
+			}
+			activeAtt = todayAtt
 		}
 
 		// Calculate duration
-		if att.CheckInTime != nil {
-			duration := now.Sub(*att.CheckInTime).Minutes()
+		if activeAtt.CheckInTime != nil {
+			duration := now.Sub(*activeAtt.CheckInTime).Minutes()
 			if duration < 0 {
 				duration = 0
 			}
-			att.WorkDurationMin = int(duration)
+			activeAtt.WorkDurationMin = int(duration)
 		}
 
-		att.CheckOutTime = &now
-		att.CheckOutLat = req.Lat
-		att.CheckOutLng = req.Lng
-		h.DB.Save(&att)
+		activeAtt.CheckOutTime = &now
+		activeAtt.CheckOutLat = req.Lat
+		activeAtt.CheckOutLng = req.Lng
+		h.DB.Save(&activeAtt)
 	} else {
 		http.Error(w, "Invalid action", http.StatusBadRequest)
 		return

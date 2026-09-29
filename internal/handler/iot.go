@@ -78,6 +78,19 @@ func (h *IoTHandler) GetDailyStatusHandler(w http.ResponseWriter, r *http.Reques
 		// 1. Check if they have an attendance record today
 		var att model.Attendance
 		errAtt := h.DB.Where("user_id = ? AND work_date = ?", u.ID, todayStr).First(&att).Error
+		
+		// If no record today, check if they are working an active unclosed overnight shift (< 18h)
+		if errAtt != nil || att.CheckInTime == nil {
+			var overnightAtt model.Attendance
+			errOvernight := h.DB.Where("user_id = ? AND check_in_time IS NOT NULL AND check_out_time IS NULL", u.ID).
+				Order("check_in_time desc").
+				First(&overnightAtt).Error
+			if errOvernight == nil && overnightAtt.CheckInTime != nil && now.Sub(*overnightAtt.CheckInTime) <= 18*time.Hour {
+				att = overnightAtt
+				errAtt = nil
+			}
+		}
+
 		if errAtt == nil && att.CheckInTime != nil {
 			status.In = att.CheckInTime.In(loc).Format("15:04")
 			checkedInCount++
