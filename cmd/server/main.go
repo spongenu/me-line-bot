@@ -48,6 +48,7 @@ func main() {
 	authHandler := handler.NewAuthHandler(db, cfg)
 	adminHandler := handler.NewAdminHandler(db, cfg, bot)
 	userHandler := handler.NewUserHandler(db)
+	iotHandler := handler.NewIoTHandler(db)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/webhook", webhookHandler.Handle)
@@ -58,6 +59,9 @@ func main() {
 
 	// Auth API
 	mux.HandleFunc("/api/auth/verify-liff", authHandler.VerifyLiffHandler)
+
+	// IoT API (Public for simple devices)
+	mux.HandleFunc("/api/iot/daily-status", iotHandler.GetDailyStatusHandler)
 
 	// Admin API (Protected by JWT)
 	requireAdmin := middleware.RequireAdmin(cfg.JWTSecret)
