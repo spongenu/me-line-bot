@@ -128,10 +128,12 @@ func (h *DashboardHandler) GetCalendarHandler(w http.ResponseWriter, r *http.Req
 
 			// Check schedule
 			var activeSched *model.UserSchedule
-			for _, s := range schedules {
-				if s.UserID == u.ID && s.EffectiveFrom <= dateStr {
-					if activeSched == nil || s.EffectiveFrom > activeSched.EffectiveFrom {
-						activeSched = &s
+			for i := range schedules {
+				s := &schedules[i]
+				effStr := s.EffectiveFrom.Format("2006-01-02")
+				if s.UserID == u.ID && effStr <= dateStr {
+					if activeSched == nil || s.EffectiveFrom.After(activeSched.EffectiveFrom) {
+						activeSched = s
 					}
 				}
 			}
