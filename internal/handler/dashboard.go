@@ -77,9 +77,6 @@ func (h *DashboardHandler) GetCalendarHandler(w http.ResponseWriter, r *http.Req
 
 	todayStr := time.Now().In(loc).Format("2006-01-02")
 	endDay := endOfMonth.Day()
-	if monthParam == todayStr[:7] {
-		endDay = time.Now().In(loc).Day()
-	}
 
 	for day := 1; day <= endDay; day++ {
 		dateStr := fmt.Sprintf("%04d-%02d-%02d", year, month, day)
@@ -90,18 +87,6 @@ func (h *DashboardHandler) GetCalendarHandler(w http.ResponseWriter, r *http.Req
 			name := u.DisplayName
 			if name == "" {
 				name = u.Name
-			}
-
-			// Check attendance
-			hasAtt := false
-			for _, a := range attendances {
-				if a.UserID == u.ID && (a.WorkDate == dateStr || (a.CheckInTime != nil && a.CheckInTime.In(loc).Format("2006-01-02") == dateStr)) {
-					hasAtt = true
-					break
-				}
-			}
-			if hasAtt {
-				continue
 			}
 
 			// Check leave
@@ -123,6 +108,23 @@ func (h *DashboardHandler) GetCalendarHandler(w http.ResponseWriter, r *http.Req
 					Type:      "leave",
 					LeaveType: leaveType,
 				})
+				continue
+			}
+
+			// If future date, don't check for absence
+			if dateStr > todayStr {
+				continue
+			}
+
+			// Check attendance
+			hasAtt := false
+			for _, a := range attendances {
+				if a.UserID == u.ID && (a.WorkDate == dateStr || (a.CheckInTime != nil && a.CheckInTime.In(loc).Format("2006-01-02") == dateStr)) {
+					hasAtt = true
+					break
+				}
+			}
+			if hasAtt {
 				continue
 			}
 
