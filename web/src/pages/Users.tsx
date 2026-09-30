@@ -162,8 +162,8 @@ export default function Users() {
         setUserQuotas({ 'ลาป่วย': 30, 'ลากิจ': 3, 'ลาพักร้อน': 6 });
       }
 
-      if (data && data.used) {
-        setUsedDaysMap(data.used);
+      if (data && data.used_days_map) {
+        setUsedDaysMap(data.used_days_map);
       } else {
         setUsedDaysMap({});
       }
