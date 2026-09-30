@@ -211,16 +211,12 @@ func (s *RichMenuService) buildMenuC() map[string]interface{} {
 		"chatBarText": "Menu",
 		"areas": []map[string]interface{}{
 			{
-				"bounds": map[string]int{"x": 0, "y": 0, "width": 833, "height": 843},
-				"action": map[string]string{"type": "message", "text": "เช็คอิน"},
-			},
-			{
-				"bounds": map[string]int{"x": 833, "y": 0, "width": 833, "height": 843},
-				"action": map[string]string{"type": "message", "text": "เช็คเอาท์"},
-			},
-			{
-				"bounds": map[string]int{"x": 1666, "y": 0, "width": 834, "height": 843},
-				"action": map[string]string{"type": "message", "text": "สรุปวันนี้"},
+				"bounds": map[string]int{"x": 0, "y": 0, "width": 2500, "height": 843},
+				"action": map[string]string{
+					"type":  "uri",
+					"label": "ระบบจัดการแอดมิน",
+					"uri":   "https://me-line-bot-chi.vercel.app/dashboard",
+				},
 			},
 		},
 	}
