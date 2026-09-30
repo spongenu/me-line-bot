@@ -49,8 +49,16 @@ func (h *IoTHandler) GetDailyStatusHandler(w http.ResponseWriter, r *http.Reques
 
 	loc, _ := time.LoadLocation("Asia/Bangkok")
 	now := time.Now().In(loc)
-	todayStr := now.Format("2006-01-02")
-	dayOfWeek := int(now.Weekday()) // 0=Sunday, 1=Monday... 6=Saturday
+	
+	// IoT Board Logical Day: 06:00 to 05:59 next day
+	// If current time is between 00:00 and 05:59, we consider it part of "yesterday"
+	effectiveDate := now
+	if now.Hour() < 6 {
+		effectiveDate = now.AddDate(0, 0, -1)
+	}
+
+	todayStr := effectiveDate.Format("2006-01-02")
+	dayOfWeek := int(effectiveDate.Weekday()) // 0=Sunday, 1=Monday... 6=Saturday
 
 	// Get all active users who have the 'staff' role
 	var users []model.User
