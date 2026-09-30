@@ -117,14 +117,14 @@ func (h *DashboardHandler) GetCalendarHandler(w http.ResponseWriter, r *http.Req
 			}
 
 			// Check attendance
-			hasAtt := false
+			hasAttendance := false
 			for _, a := range attendances {
 				if a.UserID == u.ID && (a.WorkDate == dateStr || (a.CheckInTime != nil && a.CheckInTime.In(loc).Format("2006-01-02") == dateStr)) {
-					hasAtt = true
+					hasAttendance = true
 					break
 				}
 			}
-			if hasAtt {
+			if hasAttendance {
 				continue
 			}
 
