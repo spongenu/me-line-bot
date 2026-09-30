@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import DashboardCalendar from '../components/DashboardCalendar';
 
 interface DashboardData {
   totalUsers: number;
@@ -204,6 +205,9 @@ export default function Dashboard() {
             </ResponsiveContainer>
           </div>
       </div>
+      
+      {/* ปฏิทินแสดงการลา/ขาดงาน */}
+      <DashboardCalendar />
     </div>
   );
 }

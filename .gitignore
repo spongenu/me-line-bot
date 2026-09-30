@@ -2,4 +2,7 @@
 *.exe
 *.test
 vendor/
-.DS_Store
+.DS_Store# Ignore temporary and binary files
+server
+me-bot.db
+scratch.go
