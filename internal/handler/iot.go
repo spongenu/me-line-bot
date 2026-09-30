@@ -20,10 +20,11 @@ func NewIoTHandler(db *gorm.DB) *IoTHandler {
 }
 
 type StaffStatus struct {
-	Name   string `json:"name"`
-	Status string `json:"status"` // "working", "completed", "leave", "absent"
-	In     string `json:"in"`     // HH:mm or ""
-	Out    string `json:"out"`    // HH:mm or ""
+	Name      string `json:"name"`
+	Status    string `json:"status"` // "working", "completed", "leave", "absent"
+	In        string `json:"in"`     // HH:mm or ""
+	Out       string `json:"out"`    // HH:mm or ""
+	LeaveType string `json:"leave_type,omitempty"`
 }
 
 // isScheduledDay checks if dayOfWeek (0=Sun, 1=Mon, ..., 6=Sat) is in workingDaysStr (e.g. "1,2,3,4,5")
@@ -49,7 +50,7 @@ func (h *IoTHandler) GetDailyStatusHandler(w http.ResponseWriter, r *http.Reques
 
 	loc, _ := time.LoadLocation("Asia/Bangkok")
 	now := time.Now().In(loc)
-	
+
 	// IoT Board Logical Day: 06:00 to 05:59 next day
 	// If current time is between 00:00 and 05:59, we consider it part of "yesterday"
 	effectiveDate := now
@@ -118,7 +119,8 @@ func (h *IoTHandler) GetDailyStatusHandler(w http.ResponseWriter, r *http.Reques
 		errLeave := h.DB.Where("user_id = ? AND start_date <= ? AND end_date >= ? AND status = 'approved'", u.ID, todayStr, todayStr).First(&leave).Error
 		if errLeave == nil {
 			status.Status = "leave"
-			status.In = "ลา"
+			status.In = leave.LeaveType // Show leave type in the "In" column for dashboard
+			status.LeaveType = leave.LeaveType
 			leaveCount++
 			staffList = append(staffList, status)
 			continue
