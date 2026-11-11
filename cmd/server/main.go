@@ -47,7 +47,7 @@ func main() {
 	webhookHandler := handler.NewWebhookHandler(bot, checkinSvc)
 	authHandler := handler.NewAuthHandler(db, cfg)
 	adminHandler := handler.NewAdminHandler(db, cfg, bot)
-	userHandler := handler.NewUserHandler(db)
+	userHandler := handler.NewUserHandler(db, bot)
 	iotHandler := handler.NewIoTHandler(db)
 
 	mux := http.NewServeMux()

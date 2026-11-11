@@ -11,15 +11,17 @@ import (
 	"me-bot/internal/middleware"
 	"me-bot/internal/model"
 
+	"github.com/line/line-bot-sdk-go/v7/linebot"
 	"gorm.io/gorm"
 )
 
 type UserHandler struct {
-	DB *gorm.DB
+	DB  *gorm.DB
+	Bot *linebot.Client
 }
 
-func NewUserHandler(db *gorm.DB) *UserHandler {
-	return &UserHandler{DB: db}
+func NewUserHandler(db *gorm.DB, bot *linebot.Client) *UserHandler {
+	return &UserHandler{DB: db, Bot: bot}
 }
 
 type LeaveBalanceItem struct {
@@ -210,6 +212,8 @@ func (h *UserHandler) CreateLeaveRequestHandler(w http.ResponseWriter, r *http.R
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}
+
+	go notifyLeaveRequested(h.DB, h.Bot, leaveReq)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(leaveReq)

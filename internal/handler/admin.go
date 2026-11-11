@@ -8,6 +8,7 @@ import (
 
 	"log"
 	"me-bot/internal/config"
+	"me-bot/internal/middleware"
 	"me-bot/internal/model"
 
 	"github.com/line/line-bot-sdk-go/v7/linebot"
@@ -243,18 +244,37 @@ func (h *AdminHandler) UpdateLeaveStatusHandler(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	if reqBody.Status != "approved" && reqBody.Status != "rejected" {
+		http.Error(w, "Invalid status", http.StatusBadRequest)
+		return
+	}
+
 	var leaveReq model.LeaveRequest
 	if err := h.DB.First(&leaveReq, reqID).Error; err != nil {
 		http.Error(w, "Leave request not found", http.StatusNotFound)
 		return
 	}
 
+	prevStatus := leaveReq.Status
 	leaveReq.Status = reqBody.Status
-	leaveReq.ApprovedBy = &reqBody.ApprovedBy
+
+	approverID := reqBody.ApprovedBy
+	if approverID == 0 {
+		if claims, ok := r.Context().Value(middleware.UserContextKey).(*middleware.Claims); ok && claims.UserID > 0 {
+			approverID = claims.UserID
+		}
+	}
+	if approverID > 0 {
+		leaveReq.ApprovedBy = &approverID
+	}
 
 	if err := h.DB.Save(&leaveReq).Error; err != nil {
 		http.Error(w, "Failed to update status", http.StatusInternalServerError)
 		return
+	}
+
+	if prevStatus != leaveReq.Status {
+		go notifyLeaveStatusUpdated(h.DB, h.Bot, leaveReq)
 	}
 
 	w.WriteHeader(http.StatusOK)
